@@ -1,8 +1,6 @@
 {
   "command": "node",
-  "args": [
-    "C:\\Users\\Administrator\\.gemini\\config\\plugins\\codex-desktop-bridge\\scripts\\sidecar-server.mjs"
-  ],
+  "args": ["main.mjs"],
   "restart_policy": "always",
   "display_name": "Codex Desktop Bridge",
   "description": "Live visual inspector and task dispatcher for ChatGPT Desktop Codex threads.",
