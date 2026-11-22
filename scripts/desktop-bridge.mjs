@@ -199,8 +199,31 @@ function normalizeEffort(value) {
   return key;
 }
 
+function normalizeCwdInput(rawCwd) {
+  if (!rawCwd) return process.cwd();
+  let s = String(rawCwd).trim();
+  if (/^file:\/\//i.test(s)) {
+    try {
+      return fileURLToPath(s);
+    } catch {
+      s = s.replace(/^file:\/\/\/?/i, '');
+    }
+  }
+  if (/%[0-9a-f]{2}/i.test(s)) {
+    try {
+      s = decodeURIComponent(s);
+    } catch {
+      // Keep original string if percent decoding fails.
+    }
+  }
+  if (process.platform === 'win32' && /^\/[a-zA-Z]:[\\/]/.test(s)) {
+    s = s.slice(1);
+  }
+  return path.resolve(s);
+}
+
 function resolveProjectCwd(rawCwd, { mkdir = false } = {}) {
-  const target = path.resolve(rawCwd || process.cwd());
+  const target = normalizeCwdInput(rawCwd);
   if (mkdir) mkdirSync(target, { recursive: true });
   if (!existsSync(target) || !statSync(target).isDirectory()) {
     throw new Error(`Project directory does not exist: ${target} (pass --mkdir to create it)`);
@@ -492,7 +515,7 @@ async function readJob(threadId, jobId) {
 }
 
 export async function findThreads(title, cwdFilter) {
-  const normalizedCwd = cwdFilter ? path.resolve(cwdFilter) : null;
+  const normalizedCwd = cwdFilter ? normalizeCwdInput(cwdFilter) : null;
   return withAppServer(async ({ request }) => {
     const result = await request('thread/list', {
       searchTerm: title,
@@ -528,7 +551,7 @@ export async function listThreads({ cwd, searchTerm, limit = 25 } = {}) {
   return withAppServer(async ({ request }) => {
     const result = await request('thread/list', {
       limit,
-      ...(cwd ? { cwd: path.resolve(cwd) } : {}),
+      ...(cwd ? { cwd: normalizeCwdInput(cwd) } : {}),
       ...(searchTerm ? { searchTerm } : {}),
     });
     return {
@@ -573,7 +596,7 @@ export async function forkThread({ threadId, title, cwd, model } = {}) {
   return withAppServer(async ({ request }) => {
     const res = await request('thread/fork', {
       threadId,
-      ...(cwd ? { cwd: path.resolve(cwd) } : {}),
+      ...(cwd ? { cwd: normalizeCwdInput(cwd) } : {}),
       ...(model ? { model } : {}),
       ephemeral: false,
     });

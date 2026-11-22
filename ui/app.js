@@ -9,6 +9,24 @@
       .replace(/'/g, '&#39;');
   }
 
+  function decodeWorkspacePath(raw) {
+    if (!raw) return '';
+    let s = String(raw).trim();
+    s = s.replace(/^file:\/\/\/?/i, '');
+    try {
+      s = decodeURIComponent(s);
+    } catch {
+      /* keep as-is */
+    }
+    if (/^\/[a-zA-Z]:[\\/]/.test(s)) {
+      s = s.slice(1);
+    }
+    if (/^[a-zA-Z]:\//.test(s)) {
+      s = s.replace(/\//g, '\\');
+    }
+    return s;
+  }
+
   function formatDuration(ms) {
     if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '';
     if (ms < 1000) return `${Math.round(ms)}ms`;
@@ -34,7 +52,8 @@
 
   function shortPath(p) {
     if (!p) return '';
-    const norm = String(p).replace(/\\/g, '/');
+    const decoded = decodeWorkspacePath(p);
+    const norm = String(decoded).replace(/\\/g, '/');
     const parts = norm.split('/').filter(Boolean);
     if (parts.length <= 2) return norm;
     return `…/${parts.slice(-2).join('/')}`;
@@ -56,7 +75,6 @@
     return Array.from(new Set(paths));
   }
 
-  // Authentic 4-Color Gemini Brand Sparkle & Material 3 Icons (from Icons.tsx)
   let sparkleUid = 0;
   function geminiSparkleSvg(className = '') {
     const uid = ++sparkleUid;
@@ -105,10 +123,11 @@
     search: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
     grid: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="14" rx="1.5"/><rect width="7" height="7" x="3" y="14" rx="1.5"/></svg>`,
     clock: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>`,
-    external: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>`,
+    external: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>`,
     settings: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
-    plus: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`,
+    plus: `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`,
     arrowUp: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>`,
+    mic: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>`,
     chevronDown: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`,
     close: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
     copy: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`,
@@ -116,13 +135,10 @@
     thumbUp: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>`,
     thumbDown: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>`,
     fork: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"/><path d="M12 12v3"/></svg>`,
-    terminal: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>`,
-    refresh: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>`,
   };
 
-  // Periodic Table Element mapping for Codex Models
   const ELEMENT_PRESETS = {
-    'gpt-6.2-sol': { symbol: 'So', shortName: 'Sol', theme: 'blue', desc: '主力代码审查与工程实现 (GPT-6.2 Sol)' },
+    'gpt-6.2-sol': { symbol: 'So', shortName: 'Sol', theme: 'blue', desc: '代码审查与工程实现 (GPT-6.2 Sol)' },
     'gpt-6.2-astra': { symbol: 'As', shortName: 'Astra', theme: 'purple', desc: '深度架构规划与复杂推理 (GPT-6.2 Astra)' },
     'gpt-6.1-terra': { symbol: 'Te', shortName: 'Terra', theme: 'green', desc: '前端视觉、多媒体与全栈协作 (GPT-6.1 Terra)' },
     'gpt-6-luna': { symbol: 'Lu', shortName: 'Luna', theme: 'orange', desc: '极速轻量问答与快速验证 (GPT-6 Luna)' },
@@ -136,21 +152,22 @@
         z: 0,
         id: '',
         symbol: 'In',
-        shortName: 'Inherit',
+        shortName: 'Default',
         displayName: '沿用会话默认模型',
         theme: 'blue',
         desc: '使用目标桌面会话当前选定的模型与配置',
         supportedEfforts: ['low', 'medium', 'high', 'xhigh'],
       });
     }
-    const raw = Array.isArray(models) && models.length
-      ? models
-      : [
-          { id: 'gpt-6.2-sol', displayName: 'GPT-6.2 Sol', isDefault: true, supportedEfforts: ['low', 'medium', 'high', 'xhigh'] },
-          { id: 'gpt-6.2-astra', displayName: 'GPT-6.2 Astra', supportedEfforts: ['low', 'medium', 'high', 'xhigh'] },
-          { id: 'gpt-6.1-terra', displayName: 'GPT-6.1 Terra', supportedEfforts: ['low', 'medium', 'high'] },
-          { id: 'gpt-6-luna', displayName: 'GPT-6 Luna', supportedEfforts: ['low', 'medium', 'high'] },
-        ];
+    const raw =
+      Array.isArray(models) && models.length
+        ? models
+        : [
+            { id: 'gpt-6.2-sol', displayName: 'GPT-6.2 Sol', isDefault: true, supportedEfforts: ['low', 'medium', 'high', 'xhigh'] },
+            { id: 'gpt-6.2-astra', displayName: 'GPT-6.2 Astra', supportedEfforts: ['low', 'medium', 'high', 'xhigh'] },
+            { id: 'gpt-6.1-terra', displayName: 'GPT-6.1 Terra', supportedEfforts: ['low', 'medium', 'high'] },
+            { id: 'gpt-6-luna', displayName: 'GPT-6 Luna', supportedEfforts: ['low', 'medium', 'high'] },
+          ];
 
     raw.forEach((m, idx) => {
       const preset = ELEMENT_PRESETS[m.id] || {};
@@ -175,47 +192,30 @@
     return list;
   }
 
-  const STARTER_SUGGESTIONS = [
-    {
-      label: '对当前工作区代码做只读审查，指出潜在 Bug 与文件行号',
-      sandbox: 'read-only',
-    },
-    {
-      label: '梳理当前项目的顶层架构、模块边界与核心数据流',
-      sandbox: 'read-only',
-    },
-    {
-      label: '运行测试并修复当前工作区中失败的用例或边界问题',
-      sandbox: 'workspace-write',
-    },
-  ];
-
   function mount(container, api) {
     const state = {
-      workspace: api.getWorkspace() || '',
-      scope: 'all', // 'workspace' | 'all'
+      workspace: decodeWorkspacePath(api.getWorkspace() || ''),
+      scope: 'all',
       models: [],
       projects: [],
       threads: [],
-      selectedThreadId: null, // null = Hero Landing Stage ("Where should we start?")
+      selectedThreadId: null,
       threadDetail: null,
       model: 'gpt-6.2-sol',
       effort: 'high',
-      sandbox: 'read-only', // 'read-only' | 'workspace-write'
+      sandbox: 'read-only', // 'read-only' ('对话') | 'workspace-write' ('任务')
       via: 'auto',
-      newTitle: '',
-      newCwd: '',
       promptValue: '',
-      showOptionsChips: false,
-      showSymbolInBar: true,
+      isAttachMenuOpen: false,
+      showSymbolInBar: false, // Match Screenshot 1 default ("Sol v" without extra badge unless enabled in Settings)
       openOnDispatch: false,
       isHistoryDrawerOpen: false,
       isModelPopupOpen: false,
       isSearchModalOpen: false,
       isSettingsOpen: false,
       searchQuery: '',
-      expandedThinking: {}, // turnId -> boolean
-      feedbackMap: {}, // turnId -> 'up' | 'down'
+      expandedThinking: {},
+      feedbackMap: {},
       copiedTurnId: null,
       submitting: false,
       snackbarText: null,
@@ -233,9 +233,7 @@
     }
 
     function cleanWorkspacePath() {
-      return state.workspace
-        ? state.workspace.replace(/^file:\/\/\/?/i, '').replace(/\//g, '\\')
-        : '';
+      return decodeWorkspacePath(state.workspace);
     }
 
     function getActiveModelElement() {
@@ -247,47 +245,46 @@
       );
     }
 
-    // Build persistent shell
     container.innerHTML = `
       <div class="gm-ambient-halo" id="gm-halo"></div>
 
-      <!-- Left Icon Rail (Material 3 surface, Sidebar.tsx) -->
+      <!-- Seamless Left Icon Rail matching Screenshot 1 -->
       <aside class="gm-rail" aria-label="主导航">
         <div class="gm-rail-top">
           <div class="gm-rail-item">
-            <button type="button" class="gm-icon-btn" id="gm-nav-home" aria-label="Codex Bridge 主页">
+            <button type="button" class="gm-icon-btn" id="gm-nav-home" aria-label="主页">
               ${geminiSparkleSvg()}
             </button>
-            <div class="gm-tooltip">新建协作 (Ctrl+Shift+O)</div>
+            <div class="gm-tooltip">主页</div>
           </div>
 
           <nav class="gm-rail-nav">
             <div class="gm-rail-item">
-              <button type="button" class="gm-icon-btn active" id="gm-nav-new" aria-label="新建会话">
+              <button type="button" class="gm-icon-btn active" id="gm-nav-new" aria-label="新对话">
                 ${ICONS.compose}
               </button>
-              <div class="gm-tooltip">新建会话</div>
+              <div class="gm-tooltip">新对话</div>
             </div>
 
             <div class="gm-rail-item">
-              <button type="button" class="gm-icon-btn" id="gm-nav-search" aria-label="搜索会话与模型">
+              <button type="button" class="gm-icon-btn" id="gm-nav-search" aria-label="搜索">
                 ${ICONS.search}
               </button>
-              <div class="gm-tooltip">搜索会话与模型 (Ctrl+K)</div>
+              <div class="gm-tooltip">搜索 (Ctrl+K)</div>
             </div>
 
             <div class="gm-rail-item">
-              <button type="button" class="gm-icon-btn" id="gm-nav-models" aria-label="模型元素周期表">
+              <button type="button" class="gm-icon-btn" id="gm-nav-models" aria-label="模型选择">
                 ${ICONS.grid}
               </button>
-              <div class="gm-tooltip">模型与推理深度选择</div>
+              <div class="gm-tooltip">模型选择</div>
             </div>
 
             <div class="gm-rail-item">
               <button type="button" class="gm-icon-btn" id="gm-nav-history" aria-label="历史会话">
                 ${ICONS.clock}
               </button>
-              <div class="gm-tooltip">历史 Codex 会话</div>
+              <div class="gm-tooltip">历史会话</div>
             </div>
 
             <div class="gm-rail-item">
@@ -301,16 +298,10 @@
 
         <div class="gm-rail-bottom">
           <div class="gm-rail-item">
-            <button type="button" class="gm-icon-btn" id="gm-nav-refresh" aria-label="刷新状态">
-              ${ICONS.refresh}
-            </button>
-            <div class="gm-tooltip">刷新会话状态</div>
-          </div>
-          <div class="gm-rail-item">
             <button type="button" class="gm-icon-btn" id="gm-nav-settings" aria-label="设置">
               ${ICONS.settings}
             </button>
-            <div class="gm-tooltip">桥接设置</div>
+            <div class="gm-tooltip">设置</div>
           </div>
         </div>
       </aside>
@@ -338,7 +329,6 @@
       navModels: container.querySelector('#gm-nav-models'),
       navHistory: container.querySelector('#gm-nav-history'),
       navDesktop: container.querySelector('#gm-nav-desktop'),
-      navRefresh: container.querySelector('#gm-nav-refresh'),
       navSettings: container.querySelector('#gm-nav-settings'),
       drawerRoot: container.querySelector('#gm-drawer-root'),
       topbar: container.querySelector('#gm-topbar'),
@@ -354,33 +344,14 @@
       els.navModels.classList.toggle('active', state.isModelPopupOpen);
       els.navSearch.classList.toggle('active', state.isSearchModalOpen);
       els.navSettings.classList.toggle('active', state.isSettingsOpen);
-      els.halo.style.opacity = state.selectedThreadId ? '0.32' : '1';
+      els.halo.style.opacity = state.selectedThreadId ? '0.3' : '1';
     }
 
     function renderTopbar() {
       const d = state.threadDetail;
+      // On the Hero screen (!selectedThreadId), render ZERO topbar clutter (exact match to Screenshot 1)
       if (!state.selectedThreadId || !d) {
-        const ws = cleanWorkspacePath();
-        els.topbar.innerHTML = `
-          <div class="gm-topbar-left">
-            <span class="gm-session-title" style="color:var(--gm-text-secondary);">Codex Desktop Bridge</span>
-            ${ws ? `<span class="gm-status-chip" title="${escapeHtml(ws)}">${escapeHtml(shortPath(ws))}</span>` : ''}
-          </div>
-          <div class="gm-topbar-actions">
-            <button type="button" class="gm-action-pill" id="gm-top-recent-btn">
-              ${ICONS.clock}
-              <span>最近会话 (${state.threads.length})</span>
-            </button>
-          </div>
-        `;
-        const recentBtn = els.topbar.querySelector('#gm-top-recent-btn');
-        if (recentBtn) {
-          recentBtn.addEventListener('click', () => {
-            state.isHistoryDrawerOpen = !state.isHistoryDrawerOpen;
-            updateRailActiveState();
-            renderDrawer();
-          });
-        }
+        els.topbar.innerHTML = '';
         return;
       }
 
@@ -427,7 +398,7 @@
         openBtn.addEventListener('click', async () => {
           try {
             await api.openDesktop({ threadId: d.threadId });
-            notify(`已在 ChatGPT 桌面端唤起会话 ${d.threadId.slice(0, 8)}`);
+            notify(`已在 ChatGPT 桌面端打开会话`);
           } catch (err) {
             notify(`打开桌面端失败: ${err.message}`);
           }
@@ -438,13 +409,12 @@
       if (forkBtn) {
         forkBtn.addEventListener('click', async () => {
           try {
-            notify('正在创建分支会话...');
             const res = await api.forkThread({
               threadId: d.threadId,
               title: `${title} (Fork)`,
               ...(d.cwd ? { cwd: d.cwd } : {}),
             });
-            notify(`已创建分支会话 ${String(res.threadId).slice(0, 8)}`);
+            notify(`已创建分支会话`);
             await refreshOverview(false);
             if (res.threadId) await selectThread(res.threadId, true);
           } catch (err) {
@@ -461,10 +431,10 @@
               threadId: d.threadId,
               ...(lastTurn && lastTurn.turnId ? { turnId: lastTurn.turnId } : {}),
             });
-            notify('已发送中断回合请求');
+            notify('已发送停止请求');
             await loadThreadDetail(d.threadId, false);
           } catch (err) {
-            notify(`中断失败: ${err.message}`);
+            notify(`停止失败: ${err.message}`);
           }
         });
       }
@@ -472,94 +442,72 @@
 
     function buildComposerHtml() {
       const activeEl = getActiveModelElement();
-      const ws = cleanWorkspacePath();
-      const cwdVal = state.newCwd || ws;
-      const isNewSession = !state.selectedThreadId;
+      const hasTyped = state.promptValue.trim().length > 0;
+      const placeholder = state.sandbox === 'workspace-write' ? '向 Codex 描述任务' : '问问 Codex';
 
       return `
         <form class="gm-composer-wrap" id="gm-composer-form">
+          ${
+            state.isAttachMenuOpen
+              ? `<div class="gm-attach-menu popup-animate-in">
+                  <button type="button" class="gm-attach-item" data-toggle-via="auto">
+                    <span>智能通道 (auto)</span>
+                    <span>${state.via === 'auto' ? '✓' : ''}</span>
+                  </button>
+                  <button type="button" class="gm-attach-item" data-toggle-via="queue">
+                    <span>桌面端队列 (queue)</span>
+                    <span>${state.via === 'queue' ? '✓' : ''}</span>
+                  </button>
+                  <button type="button" class="gm-attach-item" data-toggle-via="app-server">
+                    <span>后台直连 (app-server)</span>
+                    <span>${state.via === 'app-server' ? '✓' : ''}</span>
+                  </button>
+                </div>`
+              : ''
+          }
           <div class="gm-composer-box">
-            ${
-              state.showOptionsChips || isNewSession
-                ? `<div class="gm-composer-chips">
-                    ${
-                      isNewSession
-                        ? `<span class="gm-chip" title="新建桌面会话标题">
-                            <span>标题:</span>
-                            <input type="text" id="gm-chip-title" value="${escapeHtml(state.newTitle)}" placeholder="自动生成或输入标题..." />
-                          </span>
-                          <span class="gm-chip" title="项目工作目录 (cwd)">
-                            <span>目录:</span>
-                            <input type="text" id="gm-chip-cwd" value="${escapeHtml(cwdVal)}" placeholder="工作区路径..." />
-                          </span>`
-                        : `<span class="gm-chip" title="续聊投递通道">
-                            <span>通道:</span>
-                            <select id="gm-chip-via" style="background:transparent;border:none;color:var(--gm-text);font-size:11.5px;outline:none;">
-                              <option value="auto" ${state.via === 'auto' ? 'selected' : ''}>智能 (auto 回退队列)</option>
-                              <option value="queue" ${state.via === 'queue' ? 'selected' : ''}>桌面端实时队列 (queue)</option>
-                              <option value="app-server" ${state.via === 'app-server' ? 'selected' : ''}>后台直连 (app-server)</option>
-                            </select>
-                          </span>`
-                    }
-                    <span class="gm-chip">
-                      <span>权限: ${state.sandbox === 'workspace-write' ? '允许改代码' : '只读审查'}</span>
-                    </span>
-                  </div>`
-                : ''
-            }
+            <button
+              type="button"
+              class="gm-plus-btn"
+              id="gm-plus-btn"
+              aria-label="通道选项"
+            >
+              ${ICONS.plus}
+              <span class="gm-plus-dot"></span>
+            </button>
 
-            <div class="gm-composer-row">
-              <button
-                type="button"
-                class="gm-icon-btn ${state.showOptionsChips ? 'active' : ''}"
-                id="gm-toggle-chips-btn"
-                title="展开/收起会话参数 (标题、目录、投递通道)"
-              >
-                ${ICONS.plus}
-              </button>
+            <input
+              type="text"
+              class="gm-composer-input"
+              id="gm-prompt-input"
+              value="${escapeHtml(state.promptValue)}"
+              placeholder="${placeholder}"
+              autocomplete="off"
+            />
 
-              <textarea
-                rows="1"
-                class="gm-composer-input"
-                id="gm-prompt-input"
-                placeholder="${
-                  isNewSession
-                    ? '向 Codex 派发新会话任务（Enter 发送，Shift+Enter 换行）...'
-                    : '在当前会话继续追问 Codex...'
-                }"
-              >${escapeHtml(state.promptValue)}</textarea>
+            <button
+              type="button"
+              class="gm-model-trigger ${state.isModelPopupOpen ? 'open' : ''}"
+              id="gm-model-trigger-btn"
+            >
+              ${
+                state.showSymbolInBar && activeEl.symbol
+                  ? `<span class="gm-model-symbol">${escapeHtml(activeEl.symbol)}</span>`
+                  : ''
+              }
+              <span class="gm-model-name">${escapeHtml(activeEl.shortName)}</span>
+              ${ICONS.chevronDown}
+            </button>
 
-              <!-- Inline Model Trigger matching Gemini-4-Model-Periodic-Table: "[So] Sol High v" -->
-              <button
-                type="button"
-                class="gm-model-trigger ${state.isModelPopupOpen ? 'open' : ''}"
-                id="gm-model-trigger-btn"
-                title="点击打开模型元素表与推理深度选择器"
-              >
-                ${
-                  state.showSymbolInBar && activeEl.symbol
-                    ? `<span class="gm-model-symbol">${escapeHtml(activeEl.symbol)}</span>`
-                    : ''
-                }
-                <span class="gm-model-name">${escapeHtml(activeEl.shortName)}</span>
-                ${
-                  state.effort
-                    ? `<span class="gm-model-effort">${escapeHtml(state.effort)}</span>`
-                    : ''
-                }
-                ${ICONS.chevronDown}
-              </button>
-
-              <button
-                type="submit"
-                class="gm-send-btn"
-                id="gm-send-btn"
-                title="派发任务"
-                ${state.submitting ? 'disabled' : ''}
-              >
-                ${ICONS.arrowUp}
-              </button>
-            </div>
+            <button
+              type="submit"
+              class="gm-send-btn ${hasTyped ? '' : 'idle'}"
+              id="gm-send-btn"
+              aria-label="发送"
+              ${state.submitting ? 'disabled' : ''}
+            >
+              ${hasTyped ? ICONS.arrowUp : ICONS.mic}
+            </button>
           </div>
         </form>
       `;
@@ -568,53 +516,49 @@
     function bindComposerEvents(rootEl) {
       const form = rootEl.querySelector('#gm-composer-form');
       const input = rootEl.querySelector('#gm-prompt-input');
-      const chipsBtn = rootEl.querySelector('#gm-toggle-chips-btn');
+      const plusBtn = rootEl.querySelector('#gm-plus-btn');
       const modelBtn = rootEl.querySelector('#gm-model-trigger-btn');
-      const titleInput = rootEl.querySelector('#gm-chip-title');
-      const cwdInput = rootEl.querySelector('#gm-chip-cwd');
-      const viaSelect = rootEl.querySelector('#gm-chip-via');
+      const sendBtn = rootEl.querySelector('#gm-send-btn');
 
-      if (titleInput) {
-        titleInput.addEventListener('input', () => {
-          state.newTitle = titleInput.value;
+      if (plusBtn) {
+        plusBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          state.isAttachMenuOpen = !state.isAttachMenuOpen;
+          if (!state.selectedThreadId) renderStage(false);
+          else renderBottomDock();
         });
       }
-      if (cwdInput) {
-        cwdInput.addEventListener('input', () => {
-          state.newCwd = cwdInput.value;
+
+      for (const viaBtn of rootEl.querySelectorAll('[data-toggle-via]')) {
+        viaBtn.addEventListener('click', () => {
+          state.via = viaBtn.getAttribute('data-toggle-via') || 'auto';
+          state.isAttachMenuOpen = false;
+          if (!state.selectedThreadId) renderStage(false);
+          else renderBottomDock();
         });
       }
-      if (viaSelect) {
-        viaSelect.addEventListener('change', () => {
-          state.via = viaSelect.value;
-        });
-      }
-      if (chipsBtn) {
-        chipsBtn.addEventListener('click', () => {
-          state.showOptionsChips = !state.showOptionsChips;
-          renderStage();
-        });
-      }
+
       if (modelBtn) {
         modelBtn.addEventListener('click', () => {
+          state.isAttachMenuOpen = false;
           state.isModelPopupOpen = !state.isModelPopupOpen;
           updateRailActiveState();
           renderModals();
         });
       }
+
       if (input) {
         input.addEventListener('input', () => {
+          const prevHas = state.promptValue.trim().length > 0;
           state.promptValue = input.value;
-          input.style.height = 'auto';
-          input.style.height = `${Math.min(130, input.scrollHeight)}px`;
-        });
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            if (form) form.requestSubmit();
+          const nextHas = state.promptValue.trim().length > 0;
+          if (prevHas !== nextHas && sendBtn) {
+            sendBtn.classList.toggle('idle', !nextHas);
+            sendBtn.innerHTML = nextHas ? ICONS.arrowUp : ICONS.mic;
           }
         });
       }
+
       if (form) {
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
@@ -626,12 +570,10 @@
     async function handleDispatchPrompt() {
       if (state.submitting) return;
       const prompt = (state.promptValue || '').trim();
-      if (!prompt) {
-        notify('请输入要派发给 Codex 的任务提示词');
-        return;
-      }
+      if (!prompt) return;
 
       state.submitting = true;
+      state.isAttachMenuOpen = false;
       const sendBtn = container.querySelector('#gm-send-btn');
       if (sendBtn) sendBtn.disabled = true;
 
@@ -642,9 +584,8 @@
         const open = Boolean(state.openOnDispatch);
 
         if (!state.selectedThreadId) {
-          const title = (state.newTitle || '').trim() || prompt.slice(0, 36);
-          const cwd = (state.newCwd || '').trim() || cleanWorkspacePath() || undefined;
-          notify('正在创建新 Codex 会话并派发任务...');
+          const title = prompt.slice(0, 36);
+          const cwd = cleanWorkspacePath() || undefined;
           const res = await api.startTask({
             prompt,
             ...(cwd ? { cwd } : {}),
@@ -656,14 +597,11 @@
             wait: false,
           });
           state.promptValue = '';
-          state.newTitle = '';
-          notify(`已创建会话 ${String(res.threadId).slice(0, 8)} · 正在后台执行`);
           await refreshOverview(false);
           if (res.threadId) {
             await selectThread(res.threadId, true);
           }
         } else {
-          notify(`正在向会话 ${state.selectedThreadId.slice(0, 8)} 投递续聊任务...`);
           const res = await api.sendTask({
             threadId: state.selectedThreadId,
             prompt,
@@ -675,16 +613,12 @@
             wait: false,
           });
           state.promptValue = '';
-          notify(
-            res.notice
-              ? `已回退至桌面端队列实时执行`
-              : `已投递任务 (通道: ${res.via || state.via})`
-          );
+          if (res.notice) notify('已回退至桌面端实时队列');
           await loadThreadDetail(state.selectedThreadId, true);
           renderBottomDock();
         }
       } catch (err) {
-        notify(`派发失败: ${err.message}`);
+        notify(`发送失败: ${err.message}`);
       } finally {
         state.submitting = false;
         const btn = container.querySelector('#gm-send-btn');
@@ -707,69 +641,32 @@
       renderTopbar();
       updateRailActiveState();
 
-      // Case 1: Hero Landing Stage ("Where should we start?" from App.tsx)
+      // Hero Landing Stage: exact minimalist layout of Screenshot 1
       if (!state.selectedThreadId) {
         els.bottomDock.style.display = 'none';
-        const recentPreview = state.threads.slice(0, 3);
         els.stageBody.innerHTML = `
-          <div class="gm-hero-stage custom-scrollbar">
+          <div class="gm-hero-stage">
             <div class="gm-hero-inner">
-              <h1 class="gm-hero-heading">Where should we start?</h1>
-              <p class="gm-hero-sub">只读旁观不抢占 ChatGPT 桌面端写入锁 · 支持随时动态切模型或一键跳桌面端接管</p>
+              <h1 class="gm-hero-heading">需要我为你做些什么？</h1>
 
               ${buildComposerHtml()}
 
-              <!-- Workspace Sandbox Mode Switcher matching App.tsx Chat / Task pills -->
               <div class="gm-mode-switcher" role="tablist">
                 <button
                   type="button"
                   class="gm-mode-pill ${state.sandbox === 'read-only' ? 'active' : ''}"
                   data-sandbox-mode="read-only"
                 >
-                  只读审查 (Read-only)
+                  对话
                 </button>
                 <button
                   type="button"
                   class="gm-mode-pill ${state.sandbox === 'workspace-write' ? 'active' : ''}"
                   data-sandbox-mode="workspace-write"
                 >
-                  代码协作 (Workspace-write)
+                  任务
                 </button>
               </div>
-
-              <!-- Clean Monochrome Starter Prompt Suggestions -->
-              <div class="gm-suggestions">
-                ${STARTER_SUGGESTIONS.map(
-                  (item, idx) => `
-                    <button type="button" class="gm-suggestion-btn" data-suggestion-idx="${idx}">
-                      ${ICONS.terminal}
-                      <span>${escapeHtml(item.label)}</span>
-                    </button>
-                  `
-                ).join('')}
-              </div>
-
-              ${
-                recentPreview.length
-                  ? `<div style="margin-top:22px;width:100%;max-width:480px;">
-                      <div style="font-size:11.5px;color:var(--gm-text-muted);padding:0 12px 6px;">最近活跃的 Codex 会话</div>
-                      <div style="display:flex;flex-direction:column;gap:3px;">
-                        ${recentPreview
-                          .map((t) => {
-                            const title = t.name && t.name.trim() ? t.name : `会话 ${String(t.threadId).slice(0, 8)}`;
-                            return `
-                              <button type="button" class="gm-suggestion-btn" data-jump-thread="${escapeHtml(t.threadId)}">
-                                ${ICONS.clock}
-                                <span style="flex:1;">${escapeHtml(title)}</span>
-                                <span style="font-size:11px;color:var(--gm-text-muted);">${escapeHtml(formatRelativeTime(t.updatedAt))}</span>
-                              </button>
-                            `;
-                          })
-                          .join('')}
-                      </div>
-                    </div>`
-                  : ''
-              }
             </div>
           </div>
         `;
@@ -782,31 +679,10 @@
             renderStage(false);
           });
         }
-
-        for (const sugBtn of els.stageBody.querySelectorAll('[data-suggestion-idx]')) {
-          sugBtn.addEventListener('click', () => {
-            const idx = Number(sugBtn.getAttribute('data-suggestion-idx'));
-            const item = STARTER_SUGGESTIONS[idx];
-            if (item) {
-              state.promptValue = item.label;
-              state.sandbox = item.sandbox;
-              renderStage(false);
-              const inp = els.stageBody.querySelector('#gm-prompt-input');
-              if (inp) inp.focus();
-            }
-          });
-        }
-
-        for (const jumpBtn of els.stageBody.querySelectorAll('[data-jump-thread]')) {
-          jumpBtn.addEventListener('click', () => {
-            const tid = jumpBtn.getAttribute('data-jump-thread');
-            if (tid) selectThread(tid, true);
-          });
-        }
         return;
       }
 
-      // Case 2: Active Session Conversation View (ConversationView.tsx)
+      // Active Session Conversation View
       const d = state.threadDetail;
       const prevScrollEl = els.stageBody.querySelector('.gm-conversation-scroll');
       const wasNearBottom = prevScrollEl
@@ -825,7 +701,7 @@
         els.stageBody.innerHTML = `
           <div class="gm-conversation-scroll custom-scrollbar">
             <div class="gm-conversation-inner" style="padding-top:48px;text-align:center;color:var(--gm-text-muted);">
-              ${d ? '该会话暂无回合记录，可在下方输入首条任务。' : '正在同步 Codex 会话历史...'}
+              ${d ? '暂无对话记录' : '正在加载…'}
             </div>
           </div>
         `;
@@ -842,39 +718,16 @@
                   const filePaths = extractFileChangePaths(turn.fileChanges);
                   const hasThinking = commentary.length > 0 || commands.length > 0 || filePaths.length > 0;
                   const isRunning = turn.status === 'inProgress' || turn.status === 'in_progress';
-                  // Expand thinking by default when running or when there's no final reply yet
-                  const isExpanded =
-                    state.expandedThinking[turnKey] !== undefined
-                      ? state.expandedThinking[turnKey]
-                      : isRunning || !turn.reply;
+                  const isExpanded = Boolean(state.expandedThinking[turnKey]);
                   const dur = formatDuration(turn.durationMs);
                   const vote = state.feedbackMap[turnKey] || null;
                   const isCopied = state.copiedTurnId === turnKey;
 
-                  const thinkingSummaryLabel = [
-                    commentary.length ? `${commentary.length} 条思考` : '',
-                    commands.length ? `${commands.length} 条命令` : '',
-                    filePaths.length ? `${filePaths.length} 个文件变更` : '',
-                    dur ? dur : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' · ');
-
                   return `
-                    <!-- User Prompt Bubble -->
                     <div class="gm-user-turn">
-                      <div class="gm-user-meta">
-                        <span class="gm-user-meta-tag">回合 #${idx + 1}</span>
-                        ${
-                          turn.detectedJobId
-                            ? `<span class="gm-user-meta-tag">Bridge Job ${escapeHtml(String(turn.detectedJobId).slice(0, 8))}</span>`
-                            : ''
-                        }
-                      </div>
-                      <div class="gm-user-bubble">${escapeHtml(prompt || '(无文本提示词)')}</div>
+                      <div class="gm-user-bubble">${escapeHtml(prompt || '')}</div>
                     </div>
 
-                    <!-- Model Response Row with 4-Color Gemini Sparkle & Inline Show Thinking -->
                     <div class="gm-model-turn">
                       <div class="gm-sparkle-col">
                         ${geminiSparkleSvg(isRunning ? 'sparkle-spin' : '')}
@@ -888,7 +741,7 @@
                                   class="gm-thinking-toggle"
                                   data-toggle-thinking="${escapeHtml(turnKey)}"
                                 >
-                                  <span>${isExpanded ? 'Hide thinking' : 'Show thinking'} (${escapeHtml(thinkingSummaryLabel || '执行轨迹')})</span>
+                                  <span>Show thinking${dur ? ' · ' + escapeHtml(dur) : ''}</span>
                                   <span style="display:inline-flex;transform:rotate(${isExpanded ? '180deg' : '0deg'});transition:transform 0.15s ease;">
                                     ${ICONS.chevronDown}
                                   </span>
@@ -896,9 +749,7 @@
                                 ${
                                   isExpanded
                                     ? `<div class="gm-thinking-panel">
-                                        ${commentary
-                                          .map((c) => `<div>${escapeHtml(c)}</div>`)
-                                          .join('')}
+                                        ${commentary.map((c) => `<div>${escapeHtml(c)}</div>`).join('')}
                                         ${commands
                                           .map((cmd, cIdx) => {
                                             const cmdId = `${turnKey}-cmd-${cmd.id || cIdx}`;
@@ -915,7 +766,7 @@
                                                   <span class="gm-cmd-code" title="${escapeHtml(cmd.command || '')}">$ ${escapeHtml(cmd.command || '')}</span>
                                                   <span style="font-size:10.5px;flex-shrink:0;">${escapeHtml(exitLabel)}</span>
                                                 </summary>
-                                                <pre class="gm-cmd-pre custom-scrollbar">${escapeHtml(cmd.outputPreview || '(无标准输出)')}</pre>
+                                                <pre class="gm-cmd-pre custom-scrollbar">${escapeHtml(cmd.outputPreview || '(无输出)')}</pre>
                                               </details>
                                             `;
                                           })
@@ -940,22 +791,20 @@
                           turn.reply
                             ? `<div class="gm-prose">${escapeHtml(turn.reply)}</div>`
                             : turn.error
-                            ? `<div class="gm-prose" style="color:var(--gm-rose);">错误: ${escapeHtml(
+                            ? `<div class="gm-prose" style="color:var(--gm-rose);">${escapeHtml(
                                 typeof turn.error === 'string' ? turn.error : JSON.stringify(turn.error)
                               )}</div>`
                             : isRunning
-                            ? `<div style="font-size:13.5px;color:var(--gm-text-muted);">Codex 正在执行中…</div>`
-                            : `<div style="font-size:13px;color:var(--gm-text-muted);">状态: ${escapeHtml(turn.status || 'completed')}</div>`
+                            ? `<div style="font-size:13.5px;color:var(--gm-text-muted);">Just a sec…</div>`
+                            : ''
                         }
 
-                        <!-- Authentic Google Gemini Message Action Row -->
                         <div class="gm-action-row">
                           <button
                             type="button"
                             class="gm-mini-icon-btn ${vote === 'up' ? 'active' : ''}"
                             data-vote-turn="${escapeHtml(turnKey)}"
                             data-vote-dir="up"
-                            title="有帮助"
                           >
                             ${ICONS.thumbUp}
                           </button>
@@ -964,7 +813,6 @@
                             class="gm-mini-icon-btn ${vote === 'down' ? 'active' : ''}"
                             data-vote-turn="${escapeHtml(turnKey)}"
                             data-vote-dir="down"
-                            title="需改进"
                           >
                             ${ICONS.thumbDown}
                           </button>
@@ -975,7 +823,6 @@
                                   class="gm-mini-icon-btn ${isCopied ? 'active' : ''}"
                                   data-copy-turn="${idx}"
                                   data-turn-key="${escapeHtml(turnKey)}"
-                                  title="复制回复"
                                 >
                                   ${isCopied ? ICONS.check : ICONS.copy}
                                 </button>`
@@ -995,8 +842,7 @@
           toggleBtn.addEventListener('click', () => {
             const key = toggleBtn.getAttribute('data-toggle-thinking');
             if (!key) return;
-            const cur = state.expandedThinking[key] !== undefined ? state.expandedThinking[key] : true;
-            state.expandedThinking[key] = !cur;
+            state.expandedThinking[key] = !state.expandedThinking[key];
             renderStage(false);
           });
         }
@@ -1051,16 +897,16 @@
 
       els.drawerRoot.innerHTML = `
         <div class="gm-drawer-backdrop" id="gm-drawer-backdrop"></div>
-        <aside class="gm-drawer drawer-animate-in" aria-label="历史会话列表">
+        <aside class="gm-drawer drawer-animate-in" aria-label="历史会话">
           <div class="gm-drawer-header">
-            <span class="gm-drawer-title">Recent Codex Sessions</span>
-            <button type="button" class="gm-icon-btn" id="gm-drawer-close" aria-label="关闭抽屉">
+            <span class="gm-drawer-title">Recent</span>
+            <button type="button" class="gm-icon-btn" id="gm-drawer-close">
               ${ICONS.close}
             </button>
           </div>
           <div class="gm-scope-pills">
-            <button type="button" class="gm-pill-tab ${state.scope === 'all' ? 'active' : ''}" data-scope="all">全部会话</button>
-            <button type="button" class="gm-pill-tab ${state.scope === 'workspace' ? 'active' : ''}" data-scope="workspace">当前工作区</button>
+            <button type="button" class="gm-pill-tab ${state.scope === 'all' ? 'active' : ''}" data-scope="all">全部</button>
+            <button type="button" class="gm-pill-tab ${state.scope === 'workspace' ? 'active' : ''}" data-scope="workspace">当前项目</button>
           </div>
           <div class="gm-thread-list custom-scrollbar">
             ${
@@ -1079,19 +925,19 @@
                       `;
                     })
                     .join('')
-                : `<div style="padding:24px 12px;text-align:center;color:var(--gm-text-muted);font-size:12.5px;">暂无匹配的 Codex 会话</div>`
+                : `<div style="padding:24px 12px;text-align:center;color:var(--gm-text-muted);font-size:12.5px;">暂无历史会话</div>`
             }
           </div>
         </aside>
       `;
 
-      const backdrop = els.drawerRoot.querySelector('#gm-drawer-backdrop');
-      const closeBtn = els.drawerRoot.querySelector('#gm-drawer-close');
       const closeDrawer = () => {
         state.isHistoryDrawerOpen = false;
         updateRailActiveState();
         renderDrawer();
       };
+      const backdrop = els.drawerRoot.querySelector('#gm-drawer-backdrop');
+      const closeBtn = els.drawerRoot.querySelector('#gm-drawer-close');
       if (backdrop) backdrop.addEventListener('click', closeDrawer);
       if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
 
@@ -1106,16 +952,13 @@
       for (const itemBtn of els.drawerRoot.querySelectorAll('[data-select-thread]')) {
         itemBtn.addEventListener('click', async () => {
           const tid = itemBtn.getAttribute('data-select-thread');
-          state.isHistoryDrawerOpen = false;
-          updateRailActiveState();
-          renderDrawer();
+          closeDrawer();
           if (tid) await selectThread(tid, true);
         });
       }
     }
 
     function renderModals() {
-      // 1. Periodic-Table Model & Thinking Effort Popup (PeriodicTablePopup.tsx style)
       if (state.isModelPopupOpen) {
         const elements = buildModelElements(state.models, Boolean(state.selectedThreadId));
         const activeEl = getActiveModelElement();
@@ -1123,16 +966,15 @@
 
         els.modalRoot.innerHTML = `
           <div class="gm-modal-backdrop" id="gm-modal-backdrop">
-            <div class="gm-periodic-popup popup-animate-in" role="dialog" aria-label="选择 Codex 模型与推理深度">
+            <div class="gm-periodic-popup popup-animate-in" role="dialog" aria-label="选择模型">
               <div class="gm-popup-header">
                 <div class="gm-popup-title">
                   ${geminiSparkleSvg()}
-                  <span>Codex Model Periodic Selector</span>
+                  <span>选择模型</span>
                 </div>
                 <button type="button" class="gm-icon-btn" id="gm-modal-close">${ICONS.close}</button>
               </div>
 
-              <!-- Element Tile Grid -->
               <div class="gm-element-grid">
                 ${elements
                   .map((el) => {
@@ -1153,17 +995,8 @@
                   .join('')}
               </div>
 
-              <!-- Inspected Element Description -->
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 4px;font-size:12.5px;color:var(--gm-text-secondary);">
-                <div>
-                  <strong style="color:var(--gm-text);">${escapeHtml(activeEl.displayName)}</strong>
-                  <span style="margin-left:6px;color:var(--gm-text-muted);">${escapeHtml(activeEl.desc)}</span>
-                </div>
-              </div>
-
-              <!-- Thinking Level (Reasoning Effort) Segmented Selector -->
               <div class="gm-effort-bar">
-                <span style="font-size:12.5px;font-weight:500;color:var(--gm-text-secondary);">Thinking level (Effort)</span>
+                <span style="font-size:12.5px;font-weight:500;color:var(--gm-text-secondary);">Thinking level</span>
                 <div class="gm-effort-pills">
                   ${efforts
                     .map(
@@ -1223,7 +1056,6 @@
         return;
       }
 
-      // 2. Search Modal (Ctrl+K from App.tsx)
       if (state.isSearchModalOpen) {
         const q = state.searchQuery.trim().toLowerCase();
         const matchingThreads = state.threads
@@ -1239,19 +1071,19 @@
 
         els.modalRoot.innerHTML = `
           <div class="gm-modal-backdrop" id="gm-modal-backdrop">
-            <div class="gm-periodic-popup popup-animate-in" role="dialog" aria-label="搜索 Codex 会话">
+            <div class="gm-periodic-popup popup-animate-in" role="dialog" aria-label="搜索会话">
               <div style="display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--gm-border);">
                 ${ICONS.search}
                 <input
                   type="text"
                   id="gm-search-modal-input"
                   value="${escapeHtml(state.searchQuery)}"
-                  placeholder="搜索 Codex 会话标题、目录或 UUID..."
+                  placeholder="搜索会话…"
                   style="flex:1;background:transparent;border:none;color:var(--gm-text);font-size:15px;outline:none;"
                 />
                 <button type="button" class="gm-icon-btn" id="gm-modal-close">${ICONS.close}</button>
               </div>
-              <div class="custom-scrollbar" style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;" id="gm-search-results">
+              <div class="custom-scrollbar" style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">
                 ${
                   matchingThreads.length
                     ? matchingThreads
@@ -1261,7 +1093,7 @@
                             <button type="button" class="gm-thread-item" data-pick-thread="${escapeHtml(t.threadId)}">
                               <div class="gm-thread-item-main">
                                 <div class="gm-thread-item-title">${escapeHtml(title)}</div>
-                                <div class="gm-thread-item-sub">${escapeHtml(t.cwd || '')} · ${escapeHtml(formatRelativeTime(t.updatedAt))}</div>
+                                <div class="gm-thread-item-sub">${escapeHtml(shortPath(t.cwd || ''))} · ${escapeHtml(formatRelativeTime(t.updatedAt))}</div>
                               </div>
                             </button>
                           `;
@@ -1306,11 +1138,10 @@
         return;
       }
 
-      // 3. Settings Modal (Authentic Material 3 Switches from App.tsx)
       if (state.isSettingsOpen) {
         els.modalRoot.innerHTML = `
           <div class="gm-modal-backdrop" id="gm-modal-backdrop">
-            <div class="gm-periodic-popup popup-animate-in" style="max-width:420px;" role="dialog" aria-label="设置">
+            <div class="gm-periodic-popup popup-animate-in" style="max-width:420px;" role="dialog" aria-label="Settings">
               <div class="gm-popup-header">
                 <span class="gm-popup-title">Settings</span>
                 <button type="button" class="gm-icon-btn" id="gm-modal-close">${ICONS.close}</button>
@@ -1320,7 +1151,7 @@
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
                   <div>
                     <div style="font-size:14px;color:var(--gm-text);">Show element symbol in prompt bar</div>
-                    <div style="font-size:12px;color:var(--gm-text-muted);">在底部输入栏模型胶囊旁显示化学元素代号 (So / As / Te / Lu)</div>
+                    <div style="font-size:12px;color:var(--gm-text-muted);">Display the chemical symbol beside the active model</div>
                   </div>
                   <button
                     type="button"
@@ -1336,7 +1167,7 @@
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
                   <div>
                     <div style="font-size:14px;color:var(--gm-text);">Auto-open in ChatGPT Desktop</div>
-                    <div style="font-size:12px;color:var(--gm-text-muted);">派发任务后自动唤起 ChatGPT 桌面端窗口 (关闭则保持只读旁观不抢锁)</div>
+                    <div style="font-size:12px;color:var(--gm-text-muted);">Open desktop window automatically when dispatching</div>
                   </div>
                   <button
                     type="button"
@@ -1409,7 +1240,7 @@
           renderStage(scrollToBottom);
         }
       } catch (err) {
-        notify(`加载会话详情失败: ${err.message}`);
+        notify(`加载会话失败: ${err.message}`);
       }
     }
 
@@ -1422,6 +1253,7 @@
     function startNewChatStage() {
       state.selectedThreadId = null;
       state.threadDetail = null;
+      state.isAttachMenuOpen = false;
       if (!state.model) state.model = 'gpt-6.2-sol';
       state.isHistoryDrawerOpen = false;
       renderDrawer();
@@ -1431,7 +1263,7 @@
 
     async function refreshOverview(autoSelectFirst) {
       try {
-        const wsParam = state.scope === 'workspace' && state.workspace ? state.workspace : undefined;
+        const wsParam = state.scope === 'workspace' && state.workspace ? cleanWorkspacePath() : undefined;
         const data = await api.getOverview({ workspace: wsParam, limit: 30 });
         if (Array.isArray(data.models) && data.models.length) {
           state.models = data.models;
@@ -1449,11 +1281,11 @@
           renderStage(false);
         }
       } catch (err) {
-        notify(`同步 Codex 状态失败: ${err.message}`);
+        notify(`同步状态失败: ${err.message}`);
       }
     }
 
-    // Rail Navigation Listeners
+    // Rail Navigation
     els.navHome.addEventListener('click', startNewChatStage);
     els.navNew.addEventListener('click', startNewChatStage);
     els.navSearch.addEventListener('click', () => {
@@ -1479,7 +1311,10 @@
       try {
         if (state.selectedThreadId) {
           await api.openDesktop({ threadId: state.selectedThreadId });
-          notify(`已在 ChatGPT 桌面端打开会话 ${state.selectedThreadId.slice(0, 8)}`);
+          notify(`已在 ChatGPT 桌面端打开当前会话`);
+        } else if (state.threads.length > 0) {
+          await api.openDesktop({ threadId: state.threads[0].threadId });
+          notify(`已在 ChatGPT 桌面端打开最近会话`);
         } else {
           const cwd = cleanWorkspacePath();
           await api.openDesktop({ ...(cwd ? { cwd } : {}) });
@@ -1489,10 +1324,6 @@
         notify(`打开桌面端失败: ${err.message}`);
       }
     });
-    els.navRefresh.addEventListener('click', async () => {
-      await refreshOverview(false);
-      notify('已刷新最新 Codex 会话与回合状态');
-    });
     els.navSettings.addEventListener('click', () => {
       state.isSettingsOpen = !state.isSettingsOpen;
       state.isModelPopupOpen = false;
@@ -1501,7 +1332,14 @@
       renderModals();
     });
 
-    // Global Keyboard Shortcuts matching App.tsx (Ctrl+K, Ctrl+Shift+O, Escape)
+    document.addEventListener('click', (e) => {
+      if (state.isAttachMenuOpen && !e.target.closest('.gm-composer-wrap')) {
+        state.isAttachMenuOpen = false;
+        if (!state.selectedThreadId) renderStage(false);
+        else renderBottomDock();
+      }
+    });
+
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -1514,32 +1352,30 @@
         e.preventDefault();
         startNewChatStage();
       } else if (e.key === 'Escape') {
-        if (state.isModelPopupOpen || state.isSearchModalOpen || state.isSettingsOpen || state.isHistoryDrawerOpen) {
+        if (state.isModelPopupOpen || state.isSearchModalOpen || state.isSettingsOpen || state.isHistoryDrawerOpen || state.isAttachMenuOpen) {
           state.isModelPopupOpen = false;
           state.isSearchModalOpen = false;
           state.isSettingsOpen = false;
           state.isHistoryDrawerOpen = false;
+          state.isAttachMenuOpen = false;
           updateRailActiveState();
           renderDrawer();
           renderModals();
+          renderStage(false);
         }
       }
     });
 
     api.subscribeWorkspace(({ workspace }) => {
-      state.workspace = workspace || '';
+      state.workspace = decodeWorkspacePath(workspace || '');
       if (state.scope === 'workspace') {
         refreshOverview(false);
-      } else {
-        renderTopbar();
       }
     });
 
-    // Initial boot: show the Gemini Web Hero Stage or active thread
     renderStage(false);
     refreshOverview(false);
 
-    // Live polling loop
     let tick = 0;
     setInterval(() => {
       if (document.hidden || state.submitting) return;

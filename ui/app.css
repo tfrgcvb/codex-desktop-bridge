@@ -22,7 +22,7 @@ html[data-theme="dark"] {
   --gm-rose: #f28b82;
   --gm-code-bg: #131314;
   --gm-halo: radial-gradient(
-    ellipse 58% 46% at 50% 44%,
+    ellipse 56% 46% at 50% 45%,
     rgba(28, 50, 126, 0.34) 0%,
     rgba(22, 38, 96, 0.2) 30%,
     rgba(16, 26, 62, 0.08) 56%,
@@ -55,7 +55,7 @@ html[data-theme="light"] {
   --gm-rose: #b3261e;
   --gm-code-bg: #1e1f20;
   --gm-halo: radial-gradient(
-    ellipse 58% 46% at 50% 44%,
+    ellipse 56% 46% at 50% 45%,
     rgba(168, 199, 250, 0.28) 0%,
     rgba(194, 231, 255, 0.14) 35%,
     rgba(248, 250, 253, 0) 78%
@@ -168,25 +168,19 @@ body {
   transition: opacity 0.45s ease;
 }
 
-/* Left Icon Rail (Material 3 surface, matching Gemini Web & Sidebar.tsx) */
+/* Seamless Left Icon Rail (Zero border line, exact match to screenshot 1) */
 .gm-rail {
   position: relative;
   z-index: 30;
-  width: 56px;
+  width: 60px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
+  padding: 14px 0;
   user-select: none;
-  border-right: 1px solid var(--gm-border);
-  background: rgba(11, 12, 14, 0.45);
-  backdrop-filter: blur(10px);
-}
-
-html[data-theme="light"] .gm-rail {
-  background: rgba(240, 244, 249, 0.75);
+  background: transparent;
 }
 
 .gm-rail-top,
@@ -198,7 +192,7 @@ html[data-theme="light"] .gm-rail {
 }
 
 .gm-rail-top {
-  gap: 14px;
+  gap: 18px;
 }
 
 .gm-rail-nav {
@@ -240,10 +234,6 @@ html[data-theme="light"] .gm-rail {
   color: var(--gm-text);
 }
 
-.gm-icon-btn:focus-visible {
-  box-shadow: 0 0 0 2px var(--gm-primary);
-}
-
 /* Authentic Google Material 3 plain tooltip */
 .gm-tooltip {
   pointer-events: none;
@@ -266,11 +256,11 @@ html[data-theme="light"] .gm-rail {
   opacity: 1;
 }
 
-/* Slide-over Recent Threads Drawer (Sidebar.tsx style) */
+/* Slide-over Recent Threads Drawer */
 .gm-drawer-backdrop {
   position: fixed;
   inset: 0;
-  left: 56px;
+  left: 60px;
   z-index: 35;
   background: rgba(0, 0, 0, 0.48);
 }
@@ -279,9 +269,9 @@ html[data-theme="light"] .gm-rail {
   position: fixed;
   top: 0;
   bottom: 0;
-  left: 56px;
+  left: 60px;
   z-index: 40;
-  width: min(310px, calc(100vw - 56px));
+  width: min(300px, calc(100vw - 60px));
   background: var(--gm-surface);
   border-right: 1px solid var(--gm-border);
   box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
@@ -403,15 +393,19 @@ html[data-theme="light"] .gm-rail {
   overflow: hidden;
 }
 
-/* Top Floating Session Bar */
+/* Top Floating Session Bar (Only shown when viewing an active conversation) */
 .gm-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 16px;
-  min-height: 52px;
+  padding: 10px 18px;
+  min-height: 48px;
   flex-shrink: 0;
+}
+
+.gm-topbar:empty {
+  display: none;
 }
 
 .gm-topbar-left {
@@ -422,9 +416,9 @@ html[data-theme="light"] .gm-rail {
 }
 
 .gm-session-title {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
-  color: var(--gm-text);
+  color: var(--gm-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -441,7 +435,7 @@ html[data-theme="light"] .gm-rail {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 32px;
+  height: 30px;
   padding: 0 12px;
   border-radius: 9999px;
   border: 1px solid var(--gm-border);
@@ -465,18 +459,12 @@ html[data-theme="light"] .gm-rail {
   color: var(--gm-primary);
 }
 
-.gm-action-pill-primary:hover {
-  background: rgba(168, 199, 250, 0.24);
-  color: var(--gm-primary-hover);
-}
-
 .gm-action-pill-danger {
   background: rgba(242, 139, 130, 0.14);
   border-color: rgba(242, 139, 130, 0.35);
   color: var(--gm-rose);
 }
 
-/* Status Pill Badges */
 .gm-status-chip {
   display: inline-flex;
   align-items: center;
@@ -511,83 +499,38 @@ html[data-theme="light"] .gm-rail {
   color: var(--gm-rose);
 }
 
-/* Landing Stage ("Where should we start?") */
+/* Hero Landing Stage (Exact minimalist clone of Screenshot 1) */
 .gm-hero-stage {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 16px 20px 32px;
-  overflow-y: auto;
+  padding: 20px 24px 48px;
 }
 
 .gm-hero-inner {
   width: 100%;
-  max-width: 660px;
+  max-width: 640px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
 .gm-hero-heading {
-  margin: 0 0 8px;
+  margin: 0 0 28px;
   text-align: center;
   font-weight: 400;
   color: var(--gm-text);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   line-height: 1.2;
-  font-size: clamp(24px, 5vw, 38px);
+  font-size: clamp(26px, 4.5vw, 38px);
   user-select: none;
 }
 
-.gm-hero-sub {
-  margin: 0 0 22px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--gm-text-muted);
-}
-
-/* Starter Suggestion Rows (Clean monochrome rows from App.tsx) */
-.gm-suggestions {
-  margin-top: 24px;
-  width: 100%;
-  max-width: 480px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.gm-suggestion-btn {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 14px;
-  border-radius: 9999px;
-  border: none;
-  background: transparent;
-  color: var(--gm-text-secondary);
-  font-size: 13.5px;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.gm-suggestion-btn:hover {
-  background: rgba(227, 227, 227, 0.06);
-  color: var(--gm-text);
-}
-
-.gm-suggestion-btn span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Mode Switcher Pills ("Read-only Review" / "Workspace Write") */
+/* Mode Switcher Pills ("对话" / "任务" matching Screenshot 1) */
 .gm-mode-switcher {
-  margin-top: 14px;
+  margin-top: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -596,12 +539,12 @@ html[data-theme="light"] .gm-rail {
 
 .gm-mode-pill {
   height: 32px;
-  padding: 0 15px;
+  padding: 0 14px;
   border-radius: 9999px;
   border: none;
   background: transparent;
   color: var(--gm-text-muted);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -616,23 +559,24 @@ html[data-theme="light"] .gm-rail {
   color: var(--gm-text);
 }
 
-/* Authentic Google Gemini Pill Composer (Composer.tsx) */
+/* Authentic Single-Row Pill Composer (Screenshot 1) */
 .gm-composer-wrap {
   width: 100%;
-  max-width: 720px;
+  max-width: 640px;
   margin: 0 auto;
   position: relative;
 }
 
 .gm-composer-box {
   width: 100%;
+  height: 56px;
   background: var(--gm-surface);
-  border-radius: 28px;
-  padding: 10px 14px;
+  border-radius: 9999px;
+  padding: 0 10px 0 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
   transition: background-color 0.15s ease;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 8px;
 }
 
@@ -640,44 +584,35 @@ html[data-theme="light"] .gm-rail {
   background: var(--gm-surface-focus);
 }
 
-.gm-composer-chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 0 2px;
-}
-
-.gm-chip {
+.gm-plus-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
   border-radius: 9999px;
-  background: var(--gm-surface-high);
-  padding: 3px 10px;
-  font-size: 11.5px;
-  color: var(--gm-text-secondary);
-}
-
-.gm-chip input {
-  background: transparent;
   border: none;
+  background: transparent;
+  color: var(--gm-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.gm-plus-btn:hover {
+  background: var(--gm-hover);
   color: var(--gm-text);
-  font-size: 11.5px;
-  font-family: inherit;
-  outline: none;
-  width: 135px;
 }
 
-.gm-chip input::placeholder {
-  color: var(--gm-text-muted);
-}
-
-.gm-composer-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
+.gm-plus-dot {
+  position: absolute;
+  top: 7px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #4285f4;
 }
 
 .gm-composer-input {
@@ -687,25 +622,23 @@ html[data-theme="light"] .gm-rail {
   border: none;
   color: var(--gm-text);
   font-family: inherit;
-  font-size: 15px;
-  line-height: 1.45;
-  padding: 6px 4px;
+  font-size: 15.5px;
+  height: 40px;
+  padding: 0 4px;
   outline: none;
-  resize: none;
-  max-height: 130px;
 }
 
 .gm-composer-input::placeholder {
   color: var(--gm-text-muted);
 }
 
-/* Inline Model Trigger Pill matching "Neon Medium v" */
+/* Inline Model Trigger Pill matching "Neon v" in Screenshot 1 */
 .gm-model-trigger {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 36px;
-  padding: 0 12px;
+  padding: 0 10px;
   border-radius: 9999px;
   border: none;
   background: transparent;
@@ -724,20 +657,14 @@ html[data-theme="light"] .gm-rail {
 
 .gm-model-symbol {
   font-size: 11px;
-  font-weight: 600;
-  color: var(--gm-primary);
-  background: rgba(168, 199, 250, 0.14);
-  padding: 2px 5px;
-  border-radius: 5px;
+  font-weight: 500;
+  color: var(--gm-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .gm-model-name {
   font-weight: 500;
   color: var(--gm-text);
-  max-width: 130px;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .gm-model-effort {
@@ -746,7 +673,7 @@ html[data-theme="light"] .gm-rail {
   text-transform: capitalize;
 }
 
-/* Google Material 3 Circular Send Button */
+/* Send / Mic Button on far right of pill */
 .gm-send-btn {
   display: inline-flex;
   align-items: center;
@@ -759,20 +686,60 @@ html[data-theme="light"] .gm-rail {
   color: var(--gm-on-primary);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
 .gm-send-btn:hover:not(:disabled) {
   background: var(--gm-primary-hover);
 }
 
-.gm-send-btn:disabled {
-  background: var(--gm-surface-high);
-  color: var(--gm-text-muted);
-  cursor: default;
+.gm-send-btn.idle {
+  background: transparent;
+  color: var(--gm-text-secondary);
 }
 
-/* Conversation View (ConversationView.tsx) */
+.gm-send-btn.idle:hover {
+  background: var(--gm-hover);
+  color: var(--gm-text);
+}
+
+/* "+" Floating Menu Popover (Material 3 surface, matching Composer.tsx) */
+.gm-attach-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  z-index: 50;
+  width: 240px;
+  border-radius: 16px;
+  background: var(--gm-surface-high);
+  padding: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gm-attach-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border-radius: 10px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: var(--gm-text);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gm-attach-item:hover {
+  background: var(--gm-hover);
+}
+
+/* Conversation View */
 .gm-conversation-scroll {
   flex: 1;
   overflow-y: auto;
@@ -793,21 +760,6 @@ html[data-theme="light"] .gm-rail {
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
-}
-
-.gm-user-meta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.gm-user-meta-tag {
-  border-radius: 9999px;
-  background: var(--gm-surface);
-  padding: 2px 10px;
-  font-size: 11px;
-  color: var(--gm-text-secondary);
 }
 
 .gm-user-bubble {
@@ -839,7 +791,6 @@ html[data-theme="light"] .gm-rail {
   min-width: 0;
 }
 
-/* Google Gemini inline "Show thinking" disclosure */
 .gm-thinking-block {
   margin-bottom: 10px;
 }
@@ -942,7 +893,6 @@ html[data-theme="light"] .gm-rail {
   word-break: break-word;
 }
 
-/* Message Action Row */
 .gm-action-row {
   margin-top: 8px;
   margin-left: -6px;
@@ -975,14 +925,13 @@ html[data-theme="light"] .gm-rail {
   background: rgba(168, 199, 250, 0.12);
 }
 
-/* Bottom Docked Composer Area */
 .gm-bottom-dock {
   flex-shrink: 0;
-  padding: 8px 16px 14px;
+  padding: 8px 16px 16px;
   background: linear-gradient(to top, var(--gm-bg) 70%, transparent);
 }
 
-/* Periodic Table Model & Thinking Level Selector Popup (PeriodicTablePopup.tsx) */
+/* Periodic Table Model & Thinking Level Selector Popup */
 .gm-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -998,7 +947,7 @@ html[data-theme="light"] .gm-rail {
   position: relative;
   z-index: 55;
   width: 100%;
-  max-width: 540px;
+  max-width: 520px;
   border-radius: 24px;
   background: var(--gm-surface);
   padding: 18px;
@@ -1025,10 +974,9 @@ html[data-theme="light"] .gm-rail {
   gap: 8px;
 }
 
-/* Periodic Table Element Grid for Codex Models */
 .gm-element-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   gap: 8px;
 }
 
@@ -1039,21 +987,16 @@ html[data-theme="light"] .gm-rail {
   align-items: center;
   justify-content: center;
   padding: 12px 8px 10px;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: #26272b;
   color: var(--gm-text);
   cursor: pointer;
   user-select: none;
   transition: all 0.15s ease;
-  min-height: 78px;
+  min-height: 74px;
 }
 
-.gm-element-cell:hover {
-  transform: translateY(-1px);
-}
-
-/* Exact Google Material 3 tonal element themes from PeriodicTablePopup.tsx */
 .gm-element-cell.theme-blue {
   background: rgba(138, 180, 248, 0.2);
   border-color: #5b8def;
@@ -1102,7 +1045,7 @@ html[data-theme="light"] .gm-rail {
   position: absolute;
   top: 5px;
   left: 7px;
-  font-size: 9.5px;
+  font-size: 9px;
   opacity: 0.78;
   font-variant-numeric: tabular-nums;
 }
@@ -1118,10 +1061,9 @@ html[data-theme="light"] .gm-rail {
 }
 
 .gm-element-sym {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 600;
   line-height: 1.1;
-  letter-spacing: -0.02em;
 }
 
 .gm-element-label {
@@ -1134,7 +1076,6 @@ html[data-theme="light"] .gm-rail {
   text-overflow: ellipsis;
 }
 
-/* Thinking Level (Reasoning Effort) Bar inside Popup */
 .gm-effort-bar {
   display: flex;
   align-items: center;
@@ -1178,7 +1119,6 @@ html[data-theme="light"] .gm-rail {
   font-weight: 600;
 }
 
-/* Material 3 Switch (Settings Dialog) */
 .gm-switch {
   position: relative;
   display: inline-flex;
@@ -1216,10 +1156,9 @@ html[data-theme="light"] .gm-rail {
   transform: translateX(22px);
 }
 
-/* Material 3 Dark Snackbar */
 .gm-snackbar {
   position: fixed;
-  bottom: 84px;
+  bottom: 24px;
   left: 72px;
   z-index: 65;
   max-width: 360px;

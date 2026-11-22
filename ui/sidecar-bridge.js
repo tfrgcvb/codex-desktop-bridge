@@ -1,8 +1,26 @@
 /* global window, document, fetch, URLSearchParams */
 (function () {
+  function decodeWorkspaceUri(raw) {
+    if (!raw) return '';
+    let s = String(raw).trim();
+    s = s.replace(/^file:\/\/\/?/i, '');
+    try {
+      s = decodeURIComponent(s);
+    } catch {
+      /* keep as-is */
+    }
+    if (/^\/[a-zA-Z]:[\\/]/.test(s)) {
+      s = s.slice(1);
+    }
+    if (/^[a-zA-Z]:\//.test(s)) {
+      s = s.replace(/\//g, '\\');
+    }
+    return s;
+  }
+
   const params = new URLSearchParams(window.location.search);
   const token = params.get('token') || '';
-  let currentWorkspace = params.get('workspace') || '';
+  let currentWorkspace = decodeWorkspaceUri(params.get('workspace') || '');
   const listeners = new Set();
 
   function parseLuminance(raw) {
@@ -52,7 +70,8 @@
     }
     if (data.type === 'workspace-change') {
       const uris = data.payload && data.payload.workspaceUris;
-      const next = Array.isArray(uris) && uris.length > 0 ? String(uris[0] || '') : '';
+      const rawNext = Array.isArray(uris) && uris.length > 0 ? String(uris[0] || '') : '';
+      const next = decodeWorkspaceUri(rawNext);
       if (next && next !== currentWorkspace) {
         currentWorkspace = next;
         for (const fn of listeners) {
