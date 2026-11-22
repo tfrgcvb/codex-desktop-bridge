@@ -1,0 +1,28 @@
+{
+  "command": "node",
+  "args": [
+    "C:\\Users\\Administrator\\.gemini\\config\\plugins\\codex-desktop-bridge\\scripts\\sidecar-server.mjs"
+  ],
+  "restart_policy": "always",
+  "display_name": "Codex Desktop Bridge",
+  "description": "Live visual inspector and task dispatcher for ChatGPT Desktop Codex threads.",
+  "has_web_ui": true,
+  "agent_permissions": {
+    "allows_user_interactions": false
+  },
+  "ui_config": {
+    "display_name": "Codex Bridge",
+    "views": [
+      {
+        "path": "/",
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
+        "title": "Codex Bridge"
+      },
+      {
+        "path": "/",
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_SIDEBAR",
+        "title": "Codex Bridge"
+      }
+    ]
+  }
+}

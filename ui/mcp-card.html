@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codex Desktop Bridge Card</title>
+  <style>
+    :root {
+      --bg: var(--color-background-secondary, #111827);
+      --surface: var(--color-background-primary, #172033);
+      --border: var(--color-border-primary, rgba(148, 163, 184, 0.2));
+      --text: var(--color-text-primary, #f1f5f9);
+      --muted: var(--color-text-secondary, #94a3b8);
+      --accent: #38bdf8;
+      --emerald: #34d399;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --font-sans: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+      --font-mono: var(--font-mono, "Cascadia Code", Consolas, monospace);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 10px;
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      color: var(--text);
+      background: transparent;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg);
+      overflow: hidden;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 600;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .badge.completed { background: rgba(52, 211, 153, 0.15); color: var(--emerald); }
+    .badge.interrupted, .badge.pending { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+    .badge.failed { background: rgba(251, 113, 133, 0.15); color: var(--rose); }
+    .body {
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      word-break: break-all;
+    }
+    .section {
+      padding: 8px 10px;
+      border-radius: 7px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .cmd {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: #070b12;
+      color: #cbd5e1;
+      padding: 6px 9px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="title-group">
+        <strong>⇄ Codex Desktop Bridge</strong>
+        <span class="badge" id="status-badge">等待结果</span>
+      </div>
+      <div class="actions">
+        <button type="button" id="refresh-btn">↻ 刷新状态</button>
+      </div>
+    </div>
+    <div class="body" id="card-body">
+      <div class="meta">正在同步 Codex 会话数据...</div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      let rpcSeq = 0;
+      const pending = new Map();
+      let currentData = {};
+
+      function rpcRequest(method, params) {
+        const id = ++rpcSeq;
+        window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*');
+        return new Promise((resolve, reject) => {
+          pending.set(id, { resolve, reject });
+          setTimeout(() => {
+            if (pending.has(id)) {
+              pending.delete(id);
+              reject(new Error('RPC timeout'));
+            }
+          }, 15000);
+        });
+      }
+
+      function escapeHtml(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      function render(data) {
+        currentData = Object.assign({}, currentData, data || {});
+        const badge = document.getElementById('status-badge');
+        const body = document.getElementById('card-body');
+        const status = currentData.status || currentData.statusType || 'submitted';
+        badge.textContent = status;
+        badge.className = 'badge ' + (
+          status === 'completed' ? 'completed' :
+          status === 'interrupted' || status === 'pending' ? 'interrupted' :
+          status === 'failed' ? 'failed' : ''
+        );
+
+        const parts = [];
+        if (currentData.threadId) {
+          parts.push(`<div class="meta">Thread: ${escapeHtml(currentData.threadId)}${currentData.jobId ? ' · Job: ' + escapeHtml(currentData.jobId) : ''}${currentData.via ? ' · Via: ' + escapeHtml(currentData.via) : ''}</div>`);
+        }
+        if (currentData.notice) {
+          parts.push(`<div class="meta" style="color:var(--amber);">${escapeHtml(currentData.notice)}</div>`);
+        }
+        if (Array.isArray(currentData.commentary) && currentData.commentary.length) {
+          parts.push(`<div class="section">💭 ${escapeHtml(currentData.commentary.join('\n'))}</div>`);
+        }
+        if (Array.isArray(currentData.commands) && currentData.commands.length) {
+          for (const c of currentData.commands) {
+            parts.push(`<div class="cmd">$ ${escapeHtml(c.command || '')} (exit ${escapeHtml(c.exitCode ?? c.status ?? '')})</div>`);
+          }
+        }
+        if (currentData.reply) {
+          parts.push(`<div class="section">${escapeHtml(currentData.reply)}</div>`);
+        } else if (Array.isArray(currentData.turns) && currentData.turns.length) {
+          const last = currentData.turns[currentData.turns.length - 1];
+          if (last && last.reply) {
+            parts.push(`<div class="section">${escapeHtml(last.reply)}</div>`);
+          }
+        }
+        if (currentData.error) {
+          parts.push(`<div class="section" style="color:var(--rose);">错误: ${escapeHtml(currentData.error)}</div>`);
+        }
+        body.innerHTML = parts.join('') || '<div class="meta">已提交任务，可点击右上角刷新查看最新进度。</div>';
+      }
+
+      window.addEventListener('message', (event) => {
+        const msg = event && event.data;
+        if (!msg || typeof msg !== 'object') return;
+        if (msg.id && pending.has(msg.id) && !msg.method) {
+          const p = pending.get(msg.id);
+          pending.delete(msg.id);
+          if (msg.error) p.reject(new Error(msg.error.message || 'RPC error'));
+          else p.resolve(msg.result);
+          return;
+        }
+        if (msg.method === 'ui/notifications/tool-input') {
+          render(msg.params && msg.params.arguments);
+        } else if (msg.method === 'ui/notifications/tool-result') {
+          const sc = msg.params && msg.params.structuredContent;
+          if (sc) render(sc);
+        }
+      });
+
+      document.getElementById('refresh-btn').addEventListener('click', async () => {
+        if (!currentData.threadId) return;
+        try {
+          const res = currentData.jobId
+            ? await rpcRequest('tools/call', {
+                name: 'codex_status',
+                arguments: { threadId: currentData.threadId, jobId: currentData.jobId },
+              })
+            : await rpcRequest('tools/call', {
+                name: 'codex_thread_detail',
+                arguments: { threadId: currentData.threadId, limit: 5 },
+              });
+          if (res && res.structuredContent) render(res.structuredContent);
+        } catch (err) {
+          render({ error: err.message });
+        }
+      });
+
+      rpcRequest('ui/initialize', {
+        protocolVersion: '2025-11-25',
+        appInfo: { name: 'codex-desktop-bridge-card', version: '0.3.0' },
+        appCapabilities: {},
+      }).then(() => {
+        window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} }, '*');
+      }).catch(() => {});
+    })();
+  </script>
+</body>
+</html>

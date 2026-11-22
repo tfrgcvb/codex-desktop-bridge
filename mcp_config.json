@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "codex-desktop-bridge": {
+      "command": "node",
+      "args": ["${PLUGIN_ROOT}/scripts/mcp-server.mjs"]
+    }
+  }
+}

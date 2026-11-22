@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="14" y1="14" x2="114" y2="114" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="55%" stop-color="#1E1B4B"/>
+      <stop offset="100%" stop-color="#0F766E"/>
+    </linearGradient>
+    <linearGradient id="bridgeArc" x1="26" y1="42" x2="102" y2="86" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="50%" stop-color="#818CF8"/>
+      <stop offset="100%" stop-color="#34D399"/>
+    </linearGradient>
+    <linearGradient id="glowNode" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A5B4FC"/>
+      <stop offset="100%" stop-color="#2DD4BF"/>
+    </linearGradient>
+  </defs>
+  <!-- 10% safe margin: 14..114 (100x100 rounded card) -->
+  <rect x="14" y="14" width="100" height="100" rx="24" fill="url(#bgGrad)" stroke="#38BDF8" stroke-opacity="0.35" stroke-width="2"/>
+  <!-- Top terminal window dots -->
+  <circle cx="30" cy="30" r="3" fill="#38BDF8" opacity="0.8"/>
+  <circle cx="40" cy="30" r="3" fill="#818CF8" opacity="0.8"/>
+  <circle cx="50" cy="30" r="3" fill="#34D399" opacity="0.8"/>
+  <!-- Left Node (Antigravity Gemini Spark) -->
+  <path d="M38 56L41.5 64.5L50 68L41.5 71.5L38 80L34.5 71.5L26 68L34.5 64.5L38 56Z" fill="#38BDF8"/>
+  <!-- Right Node (Codex Terminal Bracket / Hexagon) -->
+  <rect x="74" y="54" width="26" height="28" rx="7" fill="#0F172A" fill-opacity="0.7" stroke="#34D399" stroke-width="2.5"/>
+  <path d="M81 63L86 68L81 73" stroke="#34D399" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="88" y1="73" x2="94" y2="73" stroke="#34D399" stroke-width="2.4" stroke-linecap="round"/>
+  <!-- Bi-directional Bridge Arcs -->
+  <path d="M47 61C56 49 67 49 75 59" stroke="url(#bridgeArc)" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 0"/>
+  <path d="M72 54L76 60L69 60" stroke="#34D399" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M74 76C65 87 55 87 46 76" stroke="url(#bridgeArc)" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+  <path d="M49 81L45 75L52 75" stroke="#38BDF8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Bottom status bar -->
+  <rect x="28" y="96" width="72" height="5" rx="2.5" fill="url(#glowNode)" opacity="0.45"/>
+</svg>

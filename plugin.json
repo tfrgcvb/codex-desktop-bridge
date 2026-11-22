@@ -1,11 +1,13 @@
 {
   "name": "codex-desktop-bridge",
   "displayName": "Codex Desktop Bridge",
-  "version": "0.2.0",
-  "description": "Delegate from Antigravity to Codex desktop sessions: auto-create threads, pick models, bind projects, and retrieve replies.",
+  "version": "0.3.0",
+  "description": "Bridge Antigravity Gemini with ChatGPT Desktop Codex: autonomous thread creation, model & effort selection, active-writer queue fallback, MCP server/cards, and a live sidecar inspector UI.",
+  "logo": "assets/logo.svg",
+  "repository": "https://github.com/tfrgcvb/codex-desktop-bridge",
   "suggestedPrompts": [
-    "列出当前可用的 Codex 模型并新建一个桌面会话审查当前项目改动",
-    "让 GPT-6.2-Sol 在 ChatGPT 桌面端新开对话分析当前代码并带回结论",
-    "查看 ChatGPT 桌面端已注册的项目目录"
+    "用 Codex Desktop Bridge 新开一个 GPT-6.2 Sol 会话对当前仓库做只读代码审查",
+    "打开 Codex Bridge 侧边面板查看最近的桌面协作会话和命令输出",
+    "向当前 Codex 桌面会话继续追问并根据审查意见修复问题"
   ]
 }

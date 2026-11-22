@@ -1,69 +1,53 @@
-# Codex Desktop Bridge
+# Codex Desktop Bridge (v0.3.0)
 
-让 Antigravity 中的 Gemini 自动在本地 Codex（支持在 ChatGPT 桌面端直接查看）创建项目对话、选择模型与推理深度、下发任务并取回回复。同时也兼容往已有 ChatGPT 桌面端会话队列中追加任务。
+让 Antigravity 中的 Gemini 与本机 **ChatGPT 桌面端 Codex** 深度协同：支持**自动创建项目会话、自主选择模型与推理深度、遇到桌面端激活窗口自动回退实时队列（`codex queue`）**，并内置 **Antigravity 侧边栏可视化监控面板（Sidecar UI）** 与 **MCP Server / 内嵌状态卡片**。
 
-## 环境要求
+---
 
-- Node.js 20+
-- ChatGPT 桌面端（Windows Store 版或桌面端自带的 `codex.exe` 已支持自动发现，也可通过 `CODEX_BIN` 显式指定）
-- 若使用自定义 `CODEX_HOME`，桥接脚本和桌面端需指向同一份本地状态目录（默认 `~/.codex`）。
+## 核心特性
 
-## 安装到 Antigravity
+1. **全自动新建会话与动态选模型（`start` / `codex_start`）**
+   - 无需提前手动在 ChatGPT 桌面端建窗口；Gemini 可根据任务类型自动挑选 `gpt-6.2-sol`、`gpt-6.2-astra`、`gpt-6.1-terra`、`gpt-6-luna` 及推理深度（`low` / `medium` / `high` / `xhigh`）。
+2. **只读旁观不抢锁的 Sidecar 可视化控制台（`sidecars/codex_bridge`）**
+   - 在 Antigravity 右侧分屏或侧边栏直接实时查看 Codex 会话的**用户提示词、中间推理思考（`commentary`）、执行的终端命令及退出码/输出预览（`commands`）、修改的文件列表（`fileChanges`）和最终回复**。
+   - 解决了直接点开 ChatGPT 桌面端窗口会导致 `ChatGPT.exe` 独占 `active writer` 写入锁、进而无法从外部动态切模型的痛点；需要人工介入时点一下面板右上角 **「↗ 桌面端打开」** 即可一键唤起原生桌面窗口。
+   - 支持在面板底部直接**新建桌面会话、续聊当前会话、切换模型/沙箱权限、一键分支会话（Fork）和停止运行中回合（Interrupt）**。
+3. **智能双通道续聊与自动回退（`send --via auto`）**
+   - 当目标会话未在桌面端焦点打开时，走 `codex app-server` 支持动态覆写模型与推理深度；
+   - 当检测到你已在 ChatGPT 桌面端打开该会话（`already has an active writer`）时，自动无缝回退到 `codex queue`，把任务实时投进你正在查看的桌面端窗口中滚动执行。
+4. **内置零依赖 MCP Server 与聊天内嵌卡片（`scripts/mcp-server.mjs` + `ui/mcp-card.html`）**
+   - 提供 `codex_models`、`codex_projects`、`codex_open_project`、`codex_threads`、`codex_thread_detail`、`codex_start`、`codex_send`、`codex_status`、`codex_interrupt`、`codex_fork` 等 10 个原生 MCP 工具，并在对话流内渲染交互式状态卡片。
 
-将本插件目录安装（或复制到）`~/.gemini/config/plugins/codex-desktop-bridge`：
+---
 
-```bash
-# 若已安装 agy CLI
-agy plugin install ./codex-desktop-bridge
+## 安装与更新
+
+需要将仓库目录同步或安装到 `~/.gemini/config/plugins/codex-desktop-bridge`：
+
+```powershell
+git clone https://github.com/tfrgcvb/codex-desktop-bridge.git
+Copy-Item -Path .\codex-desktop-bridge\* -Destination "$env:USERPROFILE\.gemini\config\plugins\codex-desktop-bridge" -Recurse -Force
 ```
 
-（Windows 下若无 `agy` CLI，可直接将整个 `codex-desktop-bridge` 目录复制到 `%USERPROFILE%\.gemini\config\plugins\codex-desktop-bridge`。）
+---
 
-## 新增能力与命令一览
+## CLI 快速参考
 
-```bash
-# 1. 查看本机可用的 Codex 模型及支持的推理深度
+```powershell
+# 1. 查看本机 Codex 可用模型与推理深度
 node scripts/desktop-bridge.mjs models
 
-# 2. 查看桌面端已记录的项目与最近工作目录
-node scripts/desktop-bridge.mjs projects
+# 2. 查看最近会话列表 / 查看指定会话完整回合详情（含命令与思考过程）
+node scripts/desktop-bridge.mjs threads --limit 10
+node scripts/desktop-bridge.mjs thread-detail --thread <UUID>
 
-# 3. 在桌面端打开/绑定一个项目目录（可选 --mkdir 自动建目录）
-node scripts/desktop-bridge.mjs open-project --cwd "E:\path\to\project"
+# 3. 自动新建会话并派发任务
+node scripts/desktop-bridge.mjs start --cwd . --model gpt-6.2-sol --effort high --title "Sol 代码审查" --sandbox read-only --prompt-file prompt.txt --wait
 
-# 4. 自动新开会话 + 自选模型/推理深度 + 后台执行首轮任务（--open 可同时弹出桌面端窗口）
-node scripts/desktop-bridge.mjs start \
-  --cwd "E:\path\to\project" \
-  --model gpt-6.2-sol \
-  --effort high \
-  --title "只读审查" \
-  --sandbox read-only \
-  --prompt-file task.txt \
-  --open
+# 4. 在已有会话继续追问（若已在桌面端打开会自动回退到 codex queue）
+node scripts/desktop-bridge.mjs send --thread <UUID> --model gpt-6.2-sol --prompt-file followup.txt --wait
 
-# 5. 查询指定任务状态与最终回复
-node scripts/desktop-bridge.mjs status --thread THREAD_UUID --job JOB_UUID
-
-# 6. 在已有会话中续聊（无参数覆盖时走 codex queue，带 --model/--effort/--via app-server 时走 app-server）
-node scripts/desktop-bridge.mjs send --thread THREAD_UUID --prompt-file followup.txt
-
-# 7. 按标题查找已有桌面会话
-node scripts/desktop-bridge.mjs find --title "Sol 协作"
+# 5. 分支已有会话 / 中断当前正在运行的回合
+node scripts/desktop-bridge.mjs fork --thread <UUID> --title "方案 B 实验"
+node scripts/desktop-bridge.mjs interrupt --thread <UUID>
 ```
-
-## 状态说明
-
-| 状态 | 含义 |
-| --- | --- |
-| `submitted` | 已提交并确认进入运行或队列，可用 `jobId` 查进度。 |
-| `pending` | 历史里暂未出现该任务（若后台 worker 启动失败会附带 `workerState` 和 `error`）。 |
-| `inProgress` | 已匹配到回合，Codex 正在处理中。 |
-| `completed` | 回合已完成，返回结果中包含 `reply`。 |
-| `mixedTurn` | 同一回合混入了其他输入，请在桌面会话里确认归属。 |
-| `uncertain` | 投递确认超时或异常，请先用原 `jobId` 查 `status` 避免重复派发。 |
-| `outsideScanWindow` | 扫描最近 60 个回合仍未找到该任务。 |
-
-## 注意事项
-
-- Windows 下如果一个全新的 `--cwd` 文件夹从未在 ChatGPT 桌面端里打开过，Electron 侧边栏的项目列表缓存可能不会立刻自动新增项目条目；可配合 `open-project --cwd <目录>` 或在 `start` 时加 `--open` / 点击返回的 `codex://threads/<threadId>` 直达该会话。
-- 后台异步执行模式默认使用 `--approval never` 配合 `--sandbox read-only`（或按需 `--sandbox workspace-write`），避免无人值守子进程卡在审批弹窗。

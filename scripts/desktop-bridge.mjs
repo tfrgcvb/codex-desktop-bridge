@@ -1,8 +1,11 @@
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync,
+} from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import os from 'node:os';
+import { once } from 'node:events';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
@@ -11,12 +14,14 @@ import { parseArgs, promisify } from 'node:util';
 const run = promisify(execFile);
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const TASK_HEADER_RE = /^\[Antigravity\/Gemini task ([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})\](?=\r?\n|$)/i;
 const RPC_TIMEOUT_MS = 15_000;
 const DEFAULT_TURN_TIMEOUT_MS = 20 * 60 * 1000;
 const VALID_EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
 const VALID_APPROVALS = new Set(['never', 'on-request', 'untrusted']);
 
 let cachedCodexBin;
+const activeTurnSessions = new Map();
 
 function codexHomeDir() {
   return process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
@@ -46,7 +51,14 @@ function jobLogPath(jobId) {
 
 function writeJsonFile(filePath, data) {
   ensureBridgeTmpDir();
-  writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  const temporary = `${filePath}.${process.pid}.tmp`;
+  try {
+    writeFileSync(temporary, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+    renameSync(temporary, filePath);
+  } catch (error) {
+    rmSync(temporary, { force: true });
+    throw error;
+  }
 }
 
 function readJsonFileSafe(filePath) {
@@ -73,7 +85,7 @@ function resolveCodexBin() {
       timeout: 3000,
     });
     const first = out.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
-    if (first && existsSync(first)) {
+    if (first && existsSync(first) && !/\.(cmd|bat)$/i.test(first)) {
       cachedCodexBin = first;
       return cachedCodexBin;
     }
@@ -99,6 +111,23 @@ function resolveCodexBin() {
       // Ignore permission or missing WindowsApps errors.
     }
 
+    // WindowsApps may block directory enumeration while allowing the registered executable to run.
+    try {
+      const locations = execFileSync('powershell.exe', [
+        '-NoProfile', '-NonInteractive', '-Command',
+        'Get-AppxPackage -Name OpenAI.Codex | Select-Object -ExpandProperty InstallLocation',
+      ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, timeout: 3000 });
+      for (const location of locations.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)) {
+        const candidate = path.join(location, 'app', 'resources', 'codex.exe');
+        if (existsSync(candidate)) {
+          cachedCodexBin = candidate;
+          return cachedCodexBin;
+        }
+      }
+    } catch {
+      // Continue to npm discovery.
+    }
+
     const npmCandidate = path.join(process.env.APPDATA || '', 'npm', 'codex.cmd');
     if (existsSync(npmCandidate)) {
       cachedCodexBin = npmCandidate;
@@ -115,7 +144,7 @@ function taskHeader(jobId) {
 }
 
 function requireId(value, name) {
-  if (!UUID_RE.test(value ?? '')) throw new Error(`${name} must be a UUID`);
+  if (typeof value !== 'string' || !UUID_RE.test(value)) throw new Error(`${name} must be a UUID`);
   return value.toLowerCase();
 }
 
@@ -147,11 +176,10 @@ function normalizeSandbox(value = 'read-only') {
       turnSandboxPolicy: { type: 'dangerFullAccess' },
     },
   };
-  const resolved = map[key];
-  if (!resolved) {
+  if (!Object.hasOwn(map, key)) {
     throw new Error(`Invalid --sandbox "${value}" (expected read-only, workspace-write, or danger-full-access)`);
   }
-  return resolved;
+  return map[key];
 }
 
 function normalizeApproval(value = 'never') {
@@ -180,30 +208,67 @@ function resolveProjectCwd(rawCwd, { mkdir = false } = {}) {
   return target;
 }
 
-function matchTurn(turn, jobId) {
+function userMessageText(item) {
+  return (item?.content || []).filter((part) => part.type === 'text').map((part) => part.text).join('\n');
+}
+
+export function summarizeTurn(turn, jobId) {
+  const items = turn.items || [];
+  const userText = userMessageText(items.find((item) => item.type === 'userMessage'));
+  const header = TASK_HEADER_RE.exec(userText);
+  const replies = items.filter((item) => item.type === 'agentMessage' && item.text?.trim());
+  const finalReplies = replies.filter((item) => item.phase === 'final_answer' || item.phase === 'partial_answer');
+
+  return {
+    turnId: turn.id,
+    status: turn.status,
+    error: turn.error ?? null,
+    startedAt: turn.startedAt ?? null,
+    completedAt: turn.completedAt ?? null,
+    durationMs: turn.durationMs ?? null,
+    userText,
+    promptText: header ? userText.slice(header[0].length).trimStart() : userText,
+    detectedJobId: header?.[1]?.toLowerCase() ?? jobId ?? null,
+    commentary: items.filter((item) => item.type === 'agentMessage' && item.phase === 'commentary')
+      .map((item) => item.text ?? ''),
+    commands: items.filter((item) => item.type === 'commandExecution').map((item) => ({
+      id: item.id,
+      command: item.command,
+      cwd: item.cwd,
+      status: item.status,
+      exitCode: item.exitCode ?? null,
+      durationMs: item.durationMs ?? null,
+      outputPreview: (item.aggregatedOutput ?? '').slice(0, 1200),
+    })),
+    fileChanges: items.filter((item) => item.type === 'fileChange').map(({ id, status, changes }) => ({
+      id, status, changes,
+    })),
+    reply: finalReplies.length
+      ? finalReplies.map((item) => item.text).join('\n\n')
+      : replies.findLast((item) => item.phase == null)?.text ?? null,
+  };
+}
+
+function turnTelemetry(turn) {
+  const { userText, promptText, detectedJobId, ...telemetry } = summarizeTurn(turn);
+  return telemetry;
+}
+
+export function matchTurn(turn, jobId) {
   const header = taskHeader(jobId);
   const firstMessage = (turn.items || []).findIndex((item) => {
     if (item.type !== 'userMessage') return false;
-    const text = (item.content || []).filter((part) => part.type === 'text').map((part) => part.text).join('\n');
-    return text === header || text.startsWith(`${header}\n`);
+    const text = userMessageText(item);
+    return text === header || text.startsWith(`${header}\n`) || text.startsWith(`${header}\r\n`);
   });
   if (firstMessage === -1) return null;
 
   const items = turn.items.slice(firstMessage + 1);
   const nextInput = items.findIndex((item) => item.type === 'userMessage');
-  const identity = { turnId: turn.id };
-  if (nextInput !== -1) return { ...identity, status: 'mixedTurn' };
-  if (turn.status !== 'completed') return { ...identity, status: turn.status };
-
-  const replies = items.filter((item) => item.type === 'agentMessage' && item.text?.trim());
-  const finalReplies = replies.filter((item) => item.phase === 'final_answer' || item.phase === 'partial_answer');
-  const reply = finalReplies.length
-    ? finalReplies.map((item) => item.text).join('\n\n')
-    : replies.findLast((item) => item.phase == null)?.text;
-
-  return reply
-    ? { ...identity, status: 'completed', reply }
-    : { ...identity, status: 'completedWithoutReply' };
+  const result = turnTelemetry({ ...turn, items: nextInput === -1 ? items : items.slice(0, nextInput) });
+  if (nextInput !== -1) return { ...result, status: 'mixedTurn', reply: null };
+  if (result.status === 'completed' && !result.reply) result.status = 'completedWithoutReply';
+  return result;
 }
 
 function handleDefaultServerRequest(msg, reply, errReply) {
@@ -235,8 +300,11 @@ async function withAppServer(fn, { timeoutMs = RPC_TIMEOUT_MS, onNotification } 
   const pending = new Map();
   let sequence = 0;
   let settledFailure;
+  let rejectSession;
+  const sessionFailure = new Promise((_, reject) => { rejectSession = reject; });
 
   function failAll(error) {
+    rejectSession(error);
     if (!settledFailure) settledFailure = error;
     for (const entry of pending.values()) {
       entry.reject(error);
@@ -252,10 +320,8 @@ async function withAppServer(fn, { timeoutMs = RPC_TIMEOUT_MS, onNotification } 
   });
   child.stdin.on('error', (error) => failAll(error));
   child.on('close', (code) => {
-    if (pending.size > 0) {
-      const stderrText = stderrChunks.join('').trim();
-      failAll(new Error(stderrText || `Codex app-server exited (code ${code ?? 'unknown'}) before replying`));
-    }
+    const stderrText = stderrChunks.join('').trim();
+    failAll(new Error(stderrText || `Codex app-server exited (code ${code ?? 'unknown'})`));
   });
 
   const timer = timeoutMs > 0
@@ -311,11 +377,14 @@ async function withAppServer(fn, { timeoutMs = RPC_TIMEOUT_MS, onNotification } 
   }
 
   try {
-    await request('initialize', {
-      clientInfo: { name: 'antigravity_codex_desktop_bridge', version: '0.2.0' },
-    });
-    write({ method: 'initialized' });
-    return await fn({ request, write });
+    return await Promise.race([sessionFailure, (async () => {
+      await request('initialize', {
+        clientInfo: { name: 'antigravity_codex_desktop_bridge', version: '0.3.0' },
+        capabilities: { experimentalApi: true },
+      });
+      write({ method: 'initialized' });
+      return fn({ request });
+    })()]);
   } finally {
     if (timer) clearTimeout(timer);
     output.close();
@@ -324,7 +393,7 @@ async function withAppServer(fn, { timeoutMs = RPC_TIMEOUT_MS, onNotification } 
   }
 }
 
-async function listModels({ includeHidden = false } = {}) {
+export async function listModels({ includeHidden = false } = {}) {
   return withAppServer(async ({ request }) => {
     const models = [];
     let cursor = null;
@@ -347,7 +416,7 @@ async function listModels({ includeHidden = false } = {}) {
   });
 }
 
-async function listProjects({ limit = 30 } = {}) {
+export async function listProjects({ limit = 30 } = {}) {
   const globalState = readJsonFileSafe(path.join(codexHomeDir(), '.codex-global-state.json')) || {};
   const savedRoots = new Set();
   for (const [key, value] of Object.entries(globalState)) {
@@ -375,33 +444,37 @@ async function listProjects({ limit = 30 } = {}) {
   };
 }
 
-function openDesktopProject(cwd) {
-  const codexBin = resolveCodexBin();
-  const child = spawn(codexBin, ['app', cwd], {
+async function launchDesktop(command, args) {
+  const child = spawn(command, args, {
     detached: true,
     stdio: 'ignore',
     windowsHide: true,
   });
+  await once(child, 'spawn');
   child.unref();
 }
 
-function openDesktopUrl(url) {
+export async function openDesktopProject(cwd, { mkdir = false } = {}) {
+  cwd = resolveProjectCwd(cwd, { mkdir });
+  await launchDesktop(resolveCodexBin(), ['app', cwd]);
+  return { cwd, launched: true };
+}
+
+export async function openDesktopUrl(url) {
   if (process.platform === 'win32') {
-    const child = spawn('rundll32.exe', ['url.dll,FileProtocolHandler', url], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-    });
-    child.unref();
-    return;
+    return launchDesktop('rundll32.exe', ['url.dll,FileProtocolHandler', url]);
   }
   const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open';
-  const child = spawn(cmd, [url], { detached: true, stdio: 'ignore' });
-  child.unref();
+  return launchDesktop(cmd, [url]);
+}
+
+function withThreadSession(threadId, fn) {
+  const active = activeTurnSessions.get(threadId);
+  return active ? fn({ request: active }) : withAppServer(fn);
 }
 
 async function readJob(threadId, jobId) {
-  return withAppServer(async ({ request }) => {
+  return withThreadSession(threadId, async ({ request }) => {
     let cursor;
     for (let page = 0; page < 5; page += 1) {
       const result = await request('thread/turns/list', {
@@ -418,7 +491,7 @@ async function readJob(threadId, jobId) {
   });
 }
 
-async function findThreads(title, cwdFilter) {
+export async function findThreads(title, cwdFilter) {
   const normalizedCwd = cwdFilter ? path.resolve(cwdFilter) : null;
   return withAppServer(async ({ request }) => {
     const result = await request('thread/list', {
@@ -439,111 +512,259 @@ async function findThreads(title, cwdFilter) {
   });
 }
 
-async function runTurnViaAppServer({
-  threadId,
-  jobId,
-  prompt,
-  model,
-  effort,
-  cwd,
-  sandbox = 'read-only',
-  approval = 'never',
-  timeoutMs = DEFAULT_TURN_TIMEOUT_MS,
-  onSubmitted,
-}) {
-  const { threadSandbox, turnSandboxPolicy } = normalizeSandbox(sandbox);
-  const approvalPolicy = normalizeApproval(approval);
+function threadSummary(thread) {
+  return {
+    threadId: thread.id,
+    name: thread.name ?? null,
+    cwd: thread.cwd,
+    source: thread.source,
+    originator: thread.originator,
+    modelProvider: thread.modelProvider,
+    desktopUrl: `codex://threads/${thread.id}`,
+  };
+}
 
-  let activeTurnId = null;
-  let resolveCompleted;
-  let rejectCompleted;
-  const completedPromise = new Promise((resolve, reject) => {
-    resolveCompleted = resolve;
-    rejectCompleted = reject;
+export async function listThreads({ cwd, searchTerm, limit = 25 } = {}) {
+  return withAppServer(async ({ request }) => {
+    const result = await request('thread/list', {
+      limit,
+      ...(cwd ? { cwd: path.resolve(cwd) } : {}),
+      ...(searchTerm ? { searchTerm } : {}),
+    });
+    return {
+      threads: (result.data || []).map((thread) => ({
+        ...threadSummary(thread), updatedAt: thread.updatedAt ?? null,
+      })),
+      hasMore: Boolean(result.nextCursor),
+    };
   });
+}
 
-  return withAppServer(
-    async ({ request }) => {
-      await request('thread/resume', {
-        threadId,
-        excludeTurns: true,
-        ...(cwd ? { cwd } : {}),
-        ...(model ? { model } : {}),
-        approvalPolicy,
-        sandbox: threadSandbox,
-      });
+export async function getThreadDetail({ threadId, limit = 15 } = {}) {
+  threadId = requireId(threadId, 'Thread ID');
+  return withThreadSession(threadId, async ({ request }) => {
+    const { thread } = await request('thread/read', { threadId, includeTurns: false });
+    const { data = [] } = await request('thread/turns/list', {
+      threadId, limit, sortDirection: 'desc', itemsView: 'full',
+    });
+    return {
+      ...threadSummary({ ...thread, id: threadId }),
+      statusType: thread?.status?.type || 'unknown',
+      turns: [...data].reverse().map((turn) => summarizeTurn(turn)),
+    };
+  });
+}
+
+export async function interruptTurn({ threadId, turnId } = {}) {
+  threadId = requireId(threadId, 'Thread ID');
+  return withThreadSession(threadId, async ({ request }) => {
+    if (!turnId) {
+      const { data } = await request('thread/turns/list', { threadId, limit: 1, sortDirection: 'desc' });
+      turnId = data?.[0]?.id;
+      if (!turnId) throw new Error(`No turns found for thread ${threadId}`);
+    }
+    await request('turn/interrupt', { threadId, turnId });
+    return { threadId, turnId, interrupted: true };
+  });
+}
+
+export async function forkThread({ threadId, title, cwd, model } = {}) {
+  threadId = requireId(threadId, 'Thread ID');
+  return withAppServer(async ({ request }) => {
+    const res = await request('thread/fork', {
+      threadId,
+      ...(cwd ? { cwd: path.resolve(cwd) } : {}),
+      ...(model ? { model } : {}),
+      ephemeral: false,
+    });
+    const newThreadId = res.thread?.id;
+    if (!newThreadId) throw new Error('thread/fork did not return thread.id');
+    if (title) await request('thread/name/set', { threadId: newThreadId, name: title });
+    return {
+      sourceThreadId: threadId,
+      threadId: newThreadId,
+      title: title || res.thread?.name || null,
+      cwd: res.cwd,
+      model: res.model,
+      desktopUrl: `codex://threads/${newThreadId}`,
+    };
+  });
+}
+
+async function createTaskThread(request, { cwd, model, effort, title, threadSandbox, approval, open, openProject }) {
+  const res = await request('thread/start', {
+    cwd,
+    ...(model ? { model } : {}),
+    approvalPolicy: approval,
+    sandbox: threadSandbox,
+    ephemeral: false,
+  });
+  const threadId = res.thread?.id;
+  if (!threadId) throw new Error('thread/start did not return thread.id');
+  if (title) await request('thread/name/set', { threadId, name: title });
+
+  const desktopUrl = `codex://threads/${threadId}`;
+  cwd = res.cwd || cwd;
+  if (openProject) await openDesktopProject(cwd);
+  if (open) await openDesktopUrl(desktopUrl);
+  return {
+    threadId, desktopUrl, cwd,
+    title: title || null,
+    model: res.model || model || null,
+    effort: effort || res.reasoningEffort || null,
+    sandbox: threadSandbox,
+    approval,
+  };
+}
+
+async function runTurnViaAppServer(spec, { onReady, onSubmitted, onProgress } = {}) {
+  const { jobId, prompt, model, effort, cwd, sandbox, approval, timeoutMs } = spec;
+  const { threadSandbox, turnSandboxPolicy } = normalizeSandbox(sandbox);
+  let threadId = spec.threadId;
+  let activeTurnId;
+  let sessionRequest;
+  let resolveCompleted;
+  const completed = new Promise((resolve) => { resolveCompleted = resolve; });
+  // Some app-server builds notify before the turn/start response arrives.
+  const earlyCompletions = new Map();
+
+  try {
+    return await withAppServer(async ({ request }) => {
+      const base = { jobId };
+      let turnCwd = cwd;
+      if (spec.createThread) {
+        const created = await createTaskThread(request, { ...spec, threadSandbox });
+        Object.assign(base, created);
+        threadId = created.threadId;
+        turnCwd = created.cwd;
+      } else {
+        Object.assign(base, { threadId, desktopUrl: `codex://threads/${threadId}`, via: 'app-server' });
+      }
+
+      onReady?.(base);
+      onProgress?.(`running thread=${threadId} job=${jobId} model=${base.model ?? model ?? (spec.createThread ? 'default' : 'thread-default')} url=${base.desktopUrl}`);
+      if (!spec.createThread) {
+        await request('thread/resume', {
+          threadId,
+          excludeTurns: true,
+          ...(cwd ? { cwd } : {}),
+          ...(model ? { model } : {}),
+          approvalPolicy: approval,
+          sandbox: threadSandbox,
+        });
+      }
 
       const turnRes = await request('turn/start', {
         threadId,
         input: [{ type: 'text', text: `${taskHeader(jobId)}\n\n${prompt}` }],
         ...(model ? { model } : {}),
         ...(effort ? { effort } : {}),
-        ...(cwd ? { cwd } : {}),
-        approvalPolicy,
+        ...(turnCwd ? { cwd: turnCwd } : {}),
+        approvalPolicy: approval,
         sandboxPolicy: turnSandboxPolicy,
       });
 
-      activeTurnId = turnRes.turn?.id ?? null;
-      onSubmitted?.(activeTurnId);
+      activeTurnId = turnRes.turn?.id;
+      if (!activeTurnId) throw new Error('turn/start did not return turn.id');
+      sessionRequest = request;
+      activeTurnSessions.set(threadId, sessionRequest);
+      onSubmitted?.({ ...base, turnId: activeTurnId, status: 'submitted' });
+      if (earlyCompletions.has(activeTurnId)) resolveCompleted(earlyCompletions.get(activeTurnId));
+      earlyCompletions.clear();
 
-      const completedTurn = await completedPromise;
+      const completedTurn = await completed;
       const matched = matchTurn(completedTurn, jobId);
-      if (matched && matched.status !== 'pending') {
-        return matched;
-      }
+      if (matched && matched.status !== 'completedWithoutReply') return { ...base, ...matched };
 
-      // Fallback in case completed notification omits full items.
+      // The completion notification may omit the turn's full item history.
       let cursor;
       for (let page = 0; page < 3; page += 1) {
         const list = await request('thread/turns/list', {
           threadId, cursor, limit: 12, sortDirection: 'desc', itemsView: 'full',
         });
-        for (const turn of list.data || []) {
-          const m = matchTurn(turn, jobId);
-          if (m) return m;
-        }
+        const turn = (list.data || []).find((entry) => entry.id === activeTurnId);
+        const history = turn && matchTurn(turn, jobId);
+        if (history && !['inProgress', 'in_progress'].includes(history.status)) return { ...base, ...history };
+        if (turn) break;
         cursor = list.nextCursor;
         if (!cursor) break;
       }
-      return {
-        turnId: activeTurnId,
-        status: completedTurn.status || 'completedWithoutReply',
-      };
-    },
-    {
+      return { ...base, ...(matched || turnTelemetry(completedTurn)) };
+    }, {
       timeoutMs,
       onNotification(msg) {
-        if (msg.method === 'turn/completed' && msg.params?.threadId === threadId) {
-          const turn = msg.params.turn;
-          if (!activeTurnId || !turn?.id || turn.id === activeTurnId) {
-            resolveCompleted(turn);
-          }
-        } else if (msg.method === 'error' && msg.params?.threadId === threadId && !msg.params?.willRetry) {
-          rejectCompleted(new Error(msg.params?.error?.message || 'Codex turn failed'));
-        }
+        if (msg.method !== 'turn/completed' || msg.params?.threadId !== threadId) return;
+        const turn = msg.params.turn;
+        if (!turn) return;
+        if (!activeTurnId) earlyCompletions.set(turn.id, turn);
+        else if (turn.id === activeTurnId) resolveCompleted(turn);
       },
-    },
-  );
+    });
+  } catch (error) {
+    if (activeTurnId) error.turnSubmitted = true;
+    throw error;
+  } finally {
+    if (sessionRequest && activeTurnSessions.get(threadId) === sessionRequest) activeTurnSessions.delete(threadId);
+  }
+}
+
+function writeJobState({ threadId, jobId }, state, fields = {}) {
+  writeJsonFile(jobStatePath(jobId), { state, threadId, jobId, ...fields, updatedAt: Date.now() });
+}
+
+async function runTrackedTurn(spec, onSubmitted) {
+  let task = spec;
+  try {
+    const result = await runTurnViaAppServer(spec, {
+      onReady(base) {
+        task = base;
+        if (spec.createThread) writeJobState(task, 'starting', { base });
+      },
+      onSubmitted(payload) {
+        task = payload;
+        writeJobState(task, 'submitted', { turnId: task.turnId, base: payload });
+        onSubmitted?.(payload);
+      },
+    });
+    writeJobState(task, 'completed', {
+      turnId: result.turnId,
+      base: task,
+      resultStatus: result.status,
+      result,
+    });
+  } catch (error) {
+    writeJobState(task, 'failed', { turnId: task.turnId, error: error.message });
+    throw error;
+  }
+}
+
+function dispatchInProcessTurn(spec) {
+  writeJobState(spec, 'starting');
+  return new Promise((resolve, reject) => {
+    // Resolve at submission. The child and its completion handler stay in this process.
+    runTrackedTurn(spec, resolve).catch(reject);
+  });
 }
 
 async function dispatchDetachedTurn(spec) {
   const { jobId } = spec;
   writeJsonFile(jobSpecPath(jobId), spec);
-  writeJsonFile(jobStatePath(jobId), {
-    state: 'starting',
-    threadId: spec.threadId,
-    jobId,
-    updatedAt: Date.now(),
-  });
+  writeJobState(spec, 'starting');
 
   const logFile = jobLogPath(jobId);
   const logFd = openSync(logFile, 'a');
-  const worker = spawn(process.execPath, [SCRIPT_PATH, '_run-turn', '--job', jobId], {
-    detached: true,
-    stdio: ['ignore', logFd, logFd],
-    windowsHide: true,
-  });
-  worker.unref();
+  let worker;
+  try {
+    worker = spawn(process.execPath, [SCRIPT_PATH, '_run-turn', '--job', jobId], {
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+      windowsHide: true,
+    });
+    await once(worker, 'spawn');
+    worker.unref();
+  } finally {
+    closeSync(logFd);
+  }
 
   let workerExited = false;
   let workerExitCode = null;
@@ -556,63 +777,40 @@ async function dispatchDetachedTurn(spec) {
   while (Date.now() < deadline) {
     const state = readJsonFileSafe(jobStatePath(jobId));
     if (state?.state === 'submitted' || state?.state === 'completed') {
-      return {
-        status: 'submitted',
-        turnId: state.turnId ?? null,
-        logFile,
-      };
+      return { ...state.base, status: 'submitted', turnId: state.turnId ?? null, logFile };
     }
     if (state?.state === 'failed') {
-      throw new Error(state.error || 'Background turn worker failed');
+      const error = new Error(state.error || 'Background turn worker failed');
+      error.turnSubmitted = Boolean(state.turnId);
+      throw error;
     }
     if (workerExited) {
       throw new Error(`Background turn worker exited early (code ${workerExitCode}). Check ${logFile}`);
     }
-    await new Promise((r) => setTimeout(r, 80));
+    await new Promise((resolve) => setTimeout(resolve, 80));
   }
 
+  const state = readJsonFileSafe(jobStatePath(jobId));
   return {
+    jobId,
+    ...(spec.threadId ? { threadId: spec.threadId, desktopUrl: `codex://threads/${spec.threadId}`, via: 'app-server' } : {}),
+    ...state?.base,
     status: 'uncertain',
     error: `Timed out waiting for worker startup ack. Check ${logFile}`,
     logFile,
   };
 }
 
+function dispatchTask(spec, { wait, inProcessAsync, onProgress }) {
+  if (wait) return runTurnViaAppServer(spec, { onProgress });
+  if (inProcessAsync) return dispatchInProcessTurn(spec);
+  return dispatchDetachedTurn(spec);
+}
+
 async function runWorkerCommand(jobId) {
   const spec = readJsonFileSafe(jobSpecPath(jobId));
   if (!spec) throw new Error(`Missing job spec for ${jobId}`);
-
-  try {
-    const result = await runTurnViaAppServer({
-      ...spec,
-      onSubmitted(turnId) {
-        writeJsonFile(jobStatePath(jobId), {
-          state: 'submitted',
-          threadId: spec.threadId,
-          jobId,
-          turnId,
-          updatedAt: Date.now(),
-        });
-      },
-    });
-    writeJsonFile(jobStatePath(jobId), {
-      state: 'completed',
-      threadId: spec.threadId,
-      jobId,
-      turnId: result.turnId ?? null,
-      resultStatus: result.status,
-      updatedAt: Date.now(),
-    });
-  } catch (error) {
-    writeJsonFile(jobStatePath(jobId), {
-      state: 'failed',
-      threadId: spec.threadId,
-      jobId,
-      error: error.message,
-      updatedAt: Date.now(),
-    });
-    throw error;
-  }
+  await runTrackedTurn(spec);
 }
 
 function parseTimeoutMs(raw) {
@@ -624,236 +822,149 @@ function parseTimeoutMs(raw) {
   return Math.floor(parsed);
 }
 
-async function startCommand(values) {
-  if (!values['prompt-file']) throw new Error('start requires --prompt-file');
-  const prompt = (await readFile(values['prompt-file'], 'utf8')).trim();
-  if (!prompt) throw new Error('The prompt file is empty');
+export async function startThreadTask(options = {}) {
+  const prompt = requirePrompt(options.prompt);
+  const cwd = resolveProjectCwd(options.cwd, { mkdir: Boolean(options.mkdir) });
+  const model = options.model?.trim() || undefined;
+  const effort = normalizeEffort(options.effort);
+  const title = options.title?.trim() || undefined;
+  const sandbox = options.sandbox || 'read-only';
+  const approval = normalizeApproval(options.approval || 'never');
+  normalizeSandbox(sandbox);
 
-  const cwd = resolveProjectCwd(values.cwd, { mkdir: Boolean(values.mkdir) });
-  const model = values.model?.trim() || undefined;
-  const effort = normalizeEffort(values.effort);
-  const title = values.title?.trim() || undefined;
-  const sandbox = values.sandbox || 'read-only';
-  const approval = normalizeApproval(values.approval || 'never');
-  const { threadSandbox } = normalizeSandbox(sandbox);
-  const timeoutMs = parseTimeoutMs(values['timeout-ms']);
-
-  const created = await withAppServer(async ({ request }) => {
-    const res = await request('thread/start', {
-      cwd,
-      ...(model ? { model } : {}),
-      approvalPolicy: approval,
-      sandbox: threadSandbox,
-      ephemeral: false,
-    });
-    const threadId = res.thread?.id;
-    if (!threadId) throw new Error('thread/start did not return thread.id');
-    if (title) {
-      await request('thread/name/set', { threadId, name: title });
-    }
-    return {
-      threadId,
-      model: res.model || model || null,
-      effort: effort || res.reasoningEffort || null,
-      cwd: res.cwd || cwd,
-    };
-  });
-
-  if (values['open-project']) openDesktopProject(created.cwd);
-  const desktopUrl = `codex://threads/${created.threadId}`;
-  if (values.open) openDesktopUrl(desktopUrl);
-
-  const jobId = randomUUID();
-  const basePayload = {
-    threadId: created.threadId,
-    jobId,
-    title: title || null,
-    cwd: created.cwd,
-    model: created.model,
-    effort: created.effort,
-    sandbox: threadSandbox,
-    approval,
-    desktopUrl,
-  };
-
-  if (values.wait) {
-    process.stderr.write(
-      `[codex-desktop-bridge] running thread=${created.threadId} job=${jobId} model=${created.model ?? 'default'} url=${desktopUrl}\n`,
-    );
-    const result = await runTurnViaAppServer({
-      threadId: created.threadId,
-      jobId,
-      prompt,
-      model,
-      effort,
-      cwd: created.cwd,
-      sandbox,
-      approval,
-      timeoutMs,
-    });
-    process.stdout.write(`${JSON.stringify({ ...basePayload, ...result })}\n`);
-    return;
-  }
-
-  const dispatch = await dispatchDetachedTurn({
-    threadId: created.threadId,
-    jobId,
+  return dispatchTask({
+    createThread: true,
+    jobId: randomUUID(),
     prompt,
     model,
     effort,
-    cwd: created.cwd,
+    title,
+    cwd,
     sandbox,
     approval,
-    timeoutMs,
-  });
-  if (dispatch.status === 'uncertain') process.exitCode = 1;
-  process.stdout.write(`${JSON.stringify({ ...basePayload, ...dispatch })}\n`);
+    open: options.open,
+    openProject: options.openProject,
+    timeoutMs: parseTimeoutMs(options.timeoutMs),
+  }, options);
+}
+
+function requirePrompt(prompt) {
+  if (typeof prompt !== 'string' || !prompt.trim()) throw new Error('A non-empty prompt is required');
+  return prompt.trim();
 }
 
 function isActiveWriterError(error) {
   return /already has an active writer/i.test(error?.message || '');
 }
 
-async function sendViaQueue({ threadId, jobId, desktopUrl, prompt, wait, timeoutMs, fallbackNotice }) {
+async function sendViaQueue({ threadId, jobId, desktopUrl, prompt, wait, timeoutMs, fallbackNotice, onProgress }) {
   const codexBin = resolveCodexBin();
+  const base = { threadId, jobId, desktopUrl, via: 'queue' };
   try {
     await run(codexBin, ['queue', '--thread', threadId, '--message', `${taskHeader(jobId)}\n\n${prompt}`], {
       timeout: RPC_TIMEOUT_MS,
       windowsHide: true,
     });
   } catch (error) {
-    const result = error.code === 'ENOENT'
-      ? { status: 'notSubmitted', error: `Codex binary not found (${codexBin}). Set CODEX_BIN to codex.exe.` }
-      : { status: 'uncertain', error: error.stderr?.trim() || error.message };
-    process.exitCode = 1;
-    process.stdout.write(`${JSON.stringify({ threadId, jobId, desktopUrl, via: 'queue', ...result })}\n`);
-    return;
+    return error.code === 'ENOENT'
+      ? { ...base, status: 'notSubmitted', error: `Codex binary not found (${codexBin}). Set CODEX_BIN to codex.exe.` }
+      : { ...base, status: 'uncertain', error: error.stderr?.trim() || error.message };
   }
 
-  if (!wait) {
-    process.stdout.write(`${JSON.stringify({
-      threadId,
-      jobId,
-      desktopUrl,
-      via: 'queue',
-      ...(fallbackNotice ? { fallbackFrom: 'app-server', notice: fallbackNotice } : {}),
-      status: 'submitted',
-    })}\n`);
-    return;
+  if (fallbackNotice) {
+    base.fallbackFrom = 'app-server';
+    base.notice = fallbackNotice;
+    if (!wait) writeJobState({ threadId, jobId }, 'submitted');
   }
+  if (!wait) return { ...base, status: 'submitted' };
 
-  process.stderr.write(
-    `[codex-desktop-bridge] queued into active desktop thread=${threadId} job=${jobId} url=${desktopUrl}\n`,
-  );
+  onProgress?.(`queued into active desktop thread=${threadId} job=${jobId} url=${desktopUrl}`);
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const result = await readJob(threadId, jobId);
-    if (result.status !== 'pending' && result.status !== 'inProgress' && result.status !== 'in_progress') {
-      process.stdout.write(`${JSON.stringify({
-        threadId,
-        jobId,
-        desktopUrl,
-        via: 'queue',
-        ...(fallbackNotice ? { fallbackFrom: 'app-server', notice: fallbackNotice } : {}),
-        ...result,
-      })}\n`);
-      return;
-    }
-    await new Promise((r) => setTimeout(r, 1500));
+    if (!['pending', 'inProgress', 'in_progress'].includes(result.status)) return { ...base, ...result };
+    await new Promise((resolve) => setTimeout(resolve, 1500));
   }
-
-  process.exitCode = 1;
-  process.stdout.write(`${JSON.stringify({
-    threadId,
-    jobId,
-    desktopUrl,
-    via: 'queue',
-    ...(fallbackNotice ? { fallbackFrom: 'app-server', notice: fallbackNotice } : {}),
-    status: 'timedOutWaitingForQueue',
-  })}\n`);
+  return { ...base, status: 'timedOutWaitingForQueue' };
 }
 
-async function sendCommand(values) {
-  const threadId = requireId(values.thread ?? process.env.CODEX_DESKTOP_THREAD_ID, 'Thread ID');
+export async function sendThreadTask(options = {}) {
+  const threadId = requireId(options.threadId ?? process.env.CODEX_DESKTOP_THREAD_ID, 'Thread ID');
   const desktopUrl = `codex://threads/${threadId}`;
-  if (!values['prompt-file']) throw new Error('send requires --prompt-file');
-  const prompt = (await readFile(values['prompt-file'], 'utf8')).trim();
-  if (!prompt) throw new Error('The prompt file is empty');
-
-  const model = values.model?.trim() || undefined;
-  const effort = normalizeEffort(values.effort);
-  const cwd = values.cwd ? resolveProjectCwd(values.cwd, { mkdir: Boolean(values.mkdir) }) : undefined;
-  const hasAppServerOverrides = Boolean(model || effort || values.sandbox || values.approval || cwd);
-  const via = values.via || 'auto';
+  const prompt = requirePrompt(options.prompt);
+  const model = options.model?.trim() || undefined;
+  const effort = normalizeEffort(options.effort);
+  const cwd = options.cwd ? resolveProjectCwd(options.cwd, { mkdir: Boolean(options.mkdir) }) : undefined;
+  const via = options.via || 'auto';
   if (!['auto', 'queue', 'app-server'].includes(via)) {
     throw new Error(`Invalid --via "${via}" (expected auto, queue, or app-server)`);
   }
 
   const jobId = randomUUID();
-  const timeoutMs = parseTimeoutMs(values['timeout-ms']);
-
-  if (values.open) openDesktopUrl(desktopUrl);
-
-  if (via === 'queue') {
-    await sendViaQueue({ threadId, jobId, desktopUrl, prompt, wait: Boolean(values.wait), timeoutMs });
-    return;
-  }
-
-  const sandbox = values.sandbox || 'read-only';
-  const approval = normalizeApproval(values.approval || 'never');
+  const timeoutMs = parseTimeoutMs(options.timeoutMs);
+  const { wait, onProgress } = options;
+  const queued = { threadId, jobId, desktopUrl, prompt, wait, timeoutMs, onProgress };
+  if (options.open) await openDesktopUrl(desktopUrl);
+  if (via === 'queue') return sendViaQueue(queued);
 
   try {
-    if (values.wait) {
-      process.stderr.write(
-        `[codex-desktop-bridge] running thread=${threadId} job=${jobId} model=${model ?? 'thread-default'} url=${desktopUrl}\n`,
-      );
-      const result = await runTurnViaAppServer({
-        threadId,
-        jobId,
-        prompt,
-        model,
-        effort,
-        cwd,
-        sandbox,
-        approval,
-        timeoutMs,
-      });
-      process.stdout.write(`${JSON.stringify({ threadId, jobId, desktopUrl, via: 'app-server', ...result })}\n`);
-      return;
-    }
-
-    const dispatch = await dispatchDetachedTurn({
-      threadId,
-      jobId,
-      prompt,
-      model,
-      effort,
-      cwd,
-      sandbox,
-      approval,
-      timeoutMs,
-    });
-    if (dispatch.status === 'uncertain') process.exitCode = 1;
-    process.stdout.write(`${JSON.stringify({ threadId, jobId, desktopUrl, via: 'app-server', ...dispatch })}\n`);
+    return await dispatchTask({
+      threadId, jobId, prompt, model, effort, cwd, timeoutMs,
+      sandbox: options.sandbox || 'read-only',
+      approval: normalizeApproval(options.approval || 'never'),
+    }, options);
   } catch (error) {
-    if (via === 'auto' && isActiveWriterError(error)) {
-      const notice = hasAppServerOverrides
-        ? 'Thread is active in ChatGPT desktop; fell back to codex queue (uses desktop thread model/settings).'
-        : 'Thread is active in ChatGPT desktop; routed via codex queue.';
-      process.stderr.write(`[codex-desktop-bridge] ${notice}\n`);
-      await sendViaQueue({
-        threadId,
-        jobId,
-        desktopUrl,
-        prompt,
-        wait: Boolean(values.wait),
-        timeoutMs,
-        fallbackNotice: notice,
-      });
-      return;
-    }
-    throw error;
+    if (via !== 'auto' || !isActiveWriterError(error) || error.turnSubmitted) throw error;
+    const hasOverrides = Boolean(model || effort || options.sandbox || options.approval || cwd);
+    const fallbackNotice = hasOverrides
+      ? 'Thread is active in ChatGPT desktop; fell back to codex queue (uses desktop thread model/settings).'
+      : 'Thread is active in ChatGPT desktop; routed via codex queue.';
+    onProgress?.(fallbackNotice);
+    return sendViaQueue({ ...queued, fallbackNotice });
   }
+}
+
+export async function getJobStatus({ threadId, jobId } = {}) {
+  threadId = requireId(threadId ?? process.env.CODEX_DESKTOP_THREAD_ID, 'Thread ID');
+  jobId = requireId(jobId, 'Job ID');
+  const base = { threadId, jobId, desktopUrl: `codex://threads/${threadId}` };
+  const worker = readJsonFileSafe(jobStatePath(jobId));
+  const state = worker?.threadId === threadId ? worker : null;
+  let result;
+  try {
+    result = await readJob(threadId, jobId);
+  } catch (error) {
+    if (!state) throw error;
+    result = { status: 'pending' };
+  }
+  if (state?.state === 'completed' && ['pending', 'outsideScanWindow', 'inProgress', 'in_progress'].includes(result.status)) {
+    return { ...base, ...state.result, status: state.resultStatus, workerState: state.state };
+  }
+  if (state?.state === 'failed' && ['inProgress', 'in_progress'].includes(result.status)) {
+    return { ...base, ...result, status: 'failed', workerState: state.state, error: state.error };
+  }
+  if (state && result.status === 'pending') {
+    return {
+      ...base,
+      ...result,
+      ...(state.turnId ? { turnId: state.turnId } : {}),
+      workerState: state.state,
+      ...(state.error ? { error: state.error } : {}),
+    };
+  }
+  return { ...base, ...result };
+}
+
+async function readPromptFile(command, filename) {
+  if (!filename) throw new Error(`${command} requires --prompt-file`);
+  const prompt = (await readFile(filename, 'utf8')).trim();
+  if (!prompt) throw new Error('The prompt file is empty');
+  return prompt;
+}
+
+function writeCliResult(result) {
+  if (['uncertain', 'notSubmitted', 'timedOutWaitingForQueue'].includes(result.status)) process.exitCode = 1;
+  process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
 function printHelp() {
@@ -868,8 +979,17 @@ function printHelp() {
     '             [--model <id>] [--effort <level>] [--sandbox <mode>] [--approval <policy>] [--wait] [--open]',
     'status       [--thread <UUID>] --job <UUID>',
     'find         --title <exact desktop chat title> [--cwd <dir>]',
+    'threads      [--cwd <dir>] [--title <search>] [--limit <N>]',
+    'thread-detail --thread <UUID> [--limit <N>]',
+    'interrupt    --thread <UUID> [--turn <UUID>]',
+    'fork         --thread <UUID> [--title <name>] [--cwd <dir>] [--model <id>]',
     'Omit --thread when CODEX_DESKTOP_THREAD_ID is set.\n',
   ].join('\n'));
+}
+
+function cliLimit(value, fallback) {
+  const limit = Number(value);
+  return Number.isInteger(limit) && limit > 0 ? limit : fallback;
 }
 
 async function main() {
@@ -877,6 +997,7 @@ async function main() {
     allowPositionals: true,
     options: {
       thread: { type: 'string' },
+      turn: { type: 'string' },
       'prompt-file': { type: 'string' },
       job: { type: 'string' },
       title: { type: 'string' },
@@ -903,9 +1024,12 @@ async function main() {
     return;
   }
 
-  const validCommands = new Set(['models', 'projects', 'open-project', 'start', 'send', 'status', 'find', '_run-turn']);
+  const validCommands = new Set([
+    'models', 'projects', 'open-project', 'start', 'send', 'status', 'find',
+    'threads', 'thread-detail', 'interrupt', 'fork', '_run-turn',
+  ]);
   if (positionals.length !== 1 || !validCommands.has(command)) {
-    throw new Error('Expected models, projects, open-project, start, send, status, or find');
+    throw new Error('Expected models, projects, open-project, start, send, status, find, threads, thread-detail, interrupt, or fork');
   }
 
   if (command === '_run-turn') {
@@ -913,62 +1037,64 @@ async function main() {
     await runWorkerCommand(jobId);
     return;
   }
-  if (command === 'models') {
-    const res = await listModels({ includeHidden: Boolean(values['include-hidden']) });
-    process.stdout.write(`${JSON.stringify(res)}\n`);
-    return;
-  }
-  if (command === 'projects') {
-    const limit = values.limit ? Number(values.limit) : 30;
-    const res = await listProjects({ limit: Number.isFinite(limit) && limit > 0 ? limit : 30 });
-    process.stdout.write(`${JSON.stringify(res)}\n`);
-    return;
-  }
-  if (command === 'open-project') {
-    if (!values.cwd) throw new Error('open-project requires --cwd');
-    const cwd = resolveProjectCwd(values.cwd, { mkdir: Boolean(values.mkdir) });
-    openDesktopProject(cwd);
-    process.stdout.write(`${JSON.stringify({ cwd, launched: true })}\n`);
-    return;
-  }
-  if (command === 'find') {
-    const title = values.title?.trim();
-    if (!title) throw new Error('find requires --title');
-    process.stdout.write(`${JSON.stringify(await findThreads(title, values.cwd))}\n`);
-    return;
-  }
-  if (command === 'status') {
-    const threadId = requireId(values.thread ?? process.env.CODEX_DESKTOP_THREAD_ID, 'Thread ID');
-    const jobId = requireId(values.job, 'Job ID');
-    const desktopUrl = `codex://threads/${threadId}`;
-    const result = await readJob(threadId, jobId);
-    if (result.status === 'pending') {
-      const workerState = readJsonFileSafe(jobStatePath(jobId));
-      if (workerState) {
-        process.stdout.write(`${JSON.stringify({
-          threadId,
-          jobId,
-          desktopUrl,
-          ...result,
-          workerState: workerState.state,
-          ...(workerState.error ? { error: workerState.error } : {}),
-        })}\n`);
-        return;
-      }
+
+  const threadId = values.thread;
+  let result;
+  switch (command) {
+    case 'models':
+      result = await listModels({ includeHidden: values['include-hidden'] });
+      break;
+    case 'projects':
+      result = await listProjects({ limit: cliLimit(values.limit, 30) });
+      break;
+    case 'open-project':
+      if (!values.cwd) throw new Error('open-project requires --cwd');
+      result = await openDesktopProject(values.cwd, { mkdir: values.mkdir });
+      break;
+    case 'find': {
+      const title = values.title?.trim();
+      if (!title) throw new Error('find requires --title');
+      result = await findThreads(title, values.cwd);
+      break;
     }
-    process.stdout.write(`${JSON.stringify({ threadId, jobId, desktopUrl, ...result })}\n`);
-    return;
+    case 'threads':
+      result = await listThreads({ cwd: values.cwd, searchTerm: values.title, limit: cliLimit(values.limit, 25) });
+      break;
+    case 'thread-detail':
+      result = await getThreadDetail({ threadId, limit: cliLimit(values.limit, 15) });
+      break;
+    case 'interrupt':
+      result = await interruptTurn({ threadId, turnId: values.turn && requireId(values.turn, 'Turn ID') });
+      break;
+    case 'fork':
+      result = await forkThread({ threadId, title: values.title, cwd: values.cwd, model: values.model });
+      break;
+    case 'status':
+      result = await getJobStatus({ threadId, jobId: values.job });
+      break;
+    case 'start':
+    case 'send': {
+      if (command === 'send') requireId(threadId ?? process.env.CODEX_DESKTOP_THREAD_ID, 'Thread ID');
+      const options = {
+        ...values,
+        threadId,
+        prompt: await readPromptFile(command, values['prompt-file']),
+        openProject: values['open-project'],
+        timeoutMs: values['timeout-ms'],
+        onProgress(message) {
+          process.stderr.write(`[codex-desktop-bridge] ${message}\n`);
+        },
+      };
+      result = await (command === 'start' ? startThreadTask(options) : sendThreadTask(options));
+      break;
+    }
   }
-  if (command === 'start') {
-    await startCommand(values);
-    return;
-  }
-  if (command === 'send') {
-    await sendCommand(values);
-  }
+  writeCliResult(result);
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error.message}\n`);
-  process.exitCode = 1;
-});
+if (path.resolve(process.argv[1] || '') === SCRIPT_PATH) {
+  main().catch((error) => {
+    process.stderr.write(`${error.message}\n`);
+    process.exitCode = 1;
+  });
+}
