@@ -1,0 +1,5 @@
+{
+  "name": "codex-desktop-bridge",
+  "version": "0.1.0",
+  "description": "Delegate from Antigravity to an existing, visible Codex desktop conversation."
+}
