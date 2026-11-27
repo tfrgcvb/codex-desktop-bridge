@@ -1,5 +1,6 @@
 :root,
 html[data-theme="dark"] {
+  color-scheme: dark;
   --gm-bg: #0b0c0e;
   --gm-surface: #1e1f20;
   --gm-surface-focus: #222326;
@@ -33,6 +34,7 @@ html[data-theme="dark"] {
 }
 
 html[data-theme="light"] {
+  color-scheme: light;
   --gm-bg: #f8fafd;
   --gm-surface: #f0f4f9;
   --gm-surface-focus: #e9eef6;

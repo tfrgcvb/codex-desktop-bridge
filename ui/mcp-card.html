@@ -1,47 +1,84 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
   <title>Codex Desktop Bridge Card</title>
   <style>
-    :root {
-      --bg: #1e1f20;
-      --surface: #282a2c;
-      --border: rgba(255, 255, 255, 0.08);
-      --text: #e3e3e3;
-      --secondary: #c4c7c5;
-      --muted: #8e918f;
+    :root,
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: var(--color-background-secondary, #16171a);
+      --surface: var(--color-background-tertiary, #1f2024);
+      --border: var(--color-border-primary, rgba(255, 255, 255, 0.1));
+      --text: var(--color-text-primary, #e6e7ea);
+      --secondary: var(--color-text-secondary, #b5b8c0);
+      --muted: var(--color-text-tertiary, #8a8e98);
       --primary: #a8c7fa;
-      --on-primary: #062e6f;
       --emerald: #7ce0bc;
       --amber: #fdba74;
       --rose: #f28b82;
-      --font-sans: "Google Sans", "Product Sans", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
-      --font-mono: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+      --cmd-bg: #0f1013;
+      --font-sans: var(--font-sans, "Google Sans", "Product Sans", system-ui, -apple-system, sans-serif);
+      --font-mono: var(--font-mono, "Cascadia Code", "JetBrains Mono", Consolas, monospace);
     }
+
+    html[data-theme="light"] {
+      color-scheme: light;
+      --bg: var(--color-background-secondary, #f4f6f9);
+      --surface: var(--color-background-primary, #ffffff);
+      --border: var(--color-border-primary, rgba(15, 23, 42, 0.12));
+      --text: var(--color-text-primary, #1f1f1f);
+      --secondary: var(--color-text-secondary, #444746);
+      --muted: var(--color-text-tertiary, #747775);
+      --primary: #0b57d0;
+      --emerald: #146c2e;
+      --amber: #b06000;
+      --rose: #b3261e;
+      --cmd-bg: #eef1f5;
+    }
+
     * { box-sizing: border-box; }
+
+    html,
     body {
       margin: 0;
-      padding: 8px;
+      padding: 0;
+      background: transparent;
       font-family: var(--font-sans);
       font-size: 13px;
       color: var(--text);
+      overflow-x: hidden;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
       background: transparent;
     }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.42);
+    }
+
     .card {
       border: 1px solid var(--border);
-      border-radius: 20px;
+      border-radius: 14px;
       background: var(--bg);
       overflow: hidden;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
     }
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      padding: 10px 14px;
+      padding: 9px 13px;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
     }
@@ -60,18 +97,18 @@
       border-radius: 999px;
       font-size: 11px;
       font-weight: 500;
-      background: rgba(138, 180, 248, 0.22);
+      background: rgba(138, 180, 248, 0.18);
       color: var(--primary);
       white-space: nowrap;
     }
-    .badge.completed { background: rgba(80, 180, 140, 0.22); color: var(--emerald); }
-    .badge.interrupted, .badge.pending { background: rgba(251, 146, 60, 0.22); color: var(--amber); }
-    .badge.failed { background: rgba(242, 139, 130, 0.22); color: var(--rose); }
+    .badge.completed { background: rgba(80, 180, 140, 0.2); color: var(--emerald); }
+    .badge.interrupted, .badge.pending { background: rgba(251, 146, 60, 0.2); color: var(--amber); }
+    .badge.failed { background: rgba(242, 139, 130, 0.2); color: var(--rose); }
     .body {
-      padding: 12px 14px;
+      padding: 11px 13px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 9px;
     }
     .meta {
       font-family: var(--font-mono);
@@ -81,13 +118,15 @@
     }
     .thinking {
       padding-left: 11px;
-      border-left: 1px solid rgba(255, 255, 255, 0.14);
-      color: var(--muted);
+      border-left: 2px solid var(--border);
+      color: var(--secondary);
       font-size: 12.5px;
+      line-height: 1.55;
       white-space: pre-wrap;
+      word-break: break-word;
     }
     .prose {
-      font-size: 14px;
+      font-size: 13.5px;
       line-height: 1.65;
       color: var(--text);
       white-space: pre-wrap;
@@ -96,11 +135,12 @@
     .cmd {
       font-family: var(--font-mono);
       font-size: 11px;
-      background: #131314;
+      background: var(--cmd-bg);
       color: var(--secondary);
       padding: 6px 10px;
-      border-radius: 10px;
+      border-radius: 8px;
       border: 1px solid var(--border);
+      word-break: break-all;
     }
     button {
       border: none;
@@ -116,10 +156,10 @@
   </style>
 </head>
 <body>
-  <div class="card">
+  <div class="card" id="card-root">
     <div class="header">
       <div class="title-group">
-        <svg viewBox="0 0 28 28" width="18" height="18" fill="none">
+        <svg viewBox="0 0 28 28" width="17" height="17" fill="none">
           <path d="M14 1.5C14 8.40356 19.5964 14 26.5 14C19.5964 14 14 19.5964 14 26.5C14 19.5964 8.40356 14 1.5 14C8.40356 14 14 8.40356 14 1.5Z" fill="#a8c7fa"/>
         </svg>
         <span>Codex Desktop Bridge</span>
@@ -137,6 +177,7 @@
       let rpcSeq = 0;
       const pending = new Map();
       let currentData = {};
+      let lastReportedHeight = 0;
 
       function rpcRequest(method, params) {
         const id = ++rpcSeq;
@@ -150,6 +191,39 @@
             }
           }, 15000);
         });
+      }
+
+      function applyHostContext(ctx) {
+        if (!ctx || typeof ctx !== 'object') return;
+        if (ctx.theme === 'light' || ctx.theme === 'dark') {
+          document.documentElement.dataset.theme = ctx.theme;
+          document.documentElement.style.colorScheme = ctx.theme;
+        }
+        const vars = ctx.styles && ctx.styles.variables;
+        if (vars && typeof vars === 'object') {
+          for (const [k, v] of Object.entries(vars)) {
+            if (typeof k === 'string' && k.startsWith('--') && typeof v === 'string') {
+              document.documentElement.style.setProperty(k, v);
+            }
+          }
+        }
+      }
+
+      function reportSize() {
+        const card = document.getElementById('card-root');
+        if (!card) return;
+        const rect = card.getBoundingClientRect();
+        const height = Math.min(800, Math.max(88, Math.ceil(rect.height + 2)));
+        if (height === lastReportedHeight) return;
+        lastReportedHeight = height;
+        window.parent.postMessage({
+          jsonrpc: '2.0',
+          method: 'ui/notifications/size-changed',
+          params: {
+            width: Math.ceil(rect.width || document.documentElement.scrollWidth || 600),
+            height,
+          },
+        }, '*');
       }
 
       function escapeHtml(s) {
@@ -198,6 +272,7 @@
           parts.push(`<div class="prose" style="color:var(--rose);">错误: ${escapeHtml(currentData.error)}</div>`);
         }
         body.innerHTML = parts.join('') || '<div class="meta">已提交任务，可点击右上角刷新查看最新进度。</div>';
+        requestAnimationFrame(reportSize);
       }
 
       window.addEventListener('message', (event) => {
@@ -215,6 +290,8 @@
         } else if (msg.method === 'ui/notifications/tool-result') {
           const sc = msg.params && msg.params.structuredContent;
           if (sc) render(sc);
+        } else if (msg.method === 'ui/notifications/host-context-changed') {
+          applyHostContext(msg.params);
         }
       });
 
@@ -236,12 +313,19 @@
         }
       });
 
+      if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(() => reportSize());
+        ro.observe(document.getElementById('card-root'));
+      }
+
       rpcRequest('ui/initialize', {
         protocolVersion: '2025-11-25',
         appInfo: { name: 'codex-desktop-bridge-card', version: '0.3.0' },
         appCapabilities: {},
-      }).then(() => {
+      }).then((res) => {
+        if (res && res.hostContext) applyHostContext(res.hostContext);
         window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} }, '*');
+        requestAnimationFrame(reportSize);
       }).catch(() => {});
     })();
   </script>
