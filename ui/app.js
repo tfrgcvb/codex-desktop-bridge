@@ -9,6 +9,116 @@
       .replace(/'/g, '&#39;');
   }
 
+  function renderInlineMarkdown(raw) {
+    const codeTokens = [];
+    let s = escapeHtml(raw);
+    s = s.replace(/`([^`\n]+)`/g, (_, code) => {
+      const idx = codeTokens.length;
+      codeTokens.push(`<code class="md-code">${code}</code>`);
+      return `\x00C${idx}\x00`;
+    });
+    s = s.replace(
+      /\[([^\]]+)\]\((https?:\/\/[^\s)]+|codex:\/\/[^\s)]+)\)/g,
+      '<a class="md-link" href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+    s = s.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+    s = s.replace(/\x00C(\d+)\x00/g, (_, idx) => codeTokens[Number(idx)] || '');
+    return s;
+  }
+
+  function renderMarkdown(md) {
+    const lines = String(md == null ? '' : md).replace(/\r\n/g, '\n').split('\n');
+    const out = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+      const fence = /^```([\w+-]*)\s*$/.exec(line);
+      if (fence) {
+        const lang = fence[1] || '';
+        const buf = [];
+        i += 1;
+        while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+          buf.push(lines[i]);
+          i += 1;
+        }
+        if (i < lines.length) i += 1;
+        out.push(
+          `<div class="md-pre">${lang ? `<div class="md-code-lang">${escapeHtml(lang)}</div>` : ''}<code>${escapeHtml(buf.join('\n'))}</code></div>`
+        );
+        continue;
+      }
+      if (!line.trim()) { i += 1; continue; }
+      if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+        out.push('<hr class="md-hr" />');
+        i += 1;
+        continue;
+      }
+      const hMatch = /^(#{1,4})\s+(.+)$/.exec(line);
+      if (hMatch) {
+        const lvl = hMatch[1].length;
+        out.push(`<h${lvl} class="md-h${lvl}">${renderInlineMarkdown(hMatch[2].trim())}</h${lvl}>`);
+        i += 1;
+        continue;
+      }
+      if (line.includes('|') && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(lines[i + 1])) {
+        const parseCells = (row) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+        const headers = parseCells(line);
+        i += 2;
+        const rows = [];
+        while (i < lines.length && lines[i].includes('|') && lines[i].trim()) {
+          rows.push(parseCells(lines[i]));
+          i += 1;
+        }
+        const thead = `<thead><tr>${headers.map((h) => `<th>${renderInlineMarkdown(h)}</th>`).join('')}</tr></thead>`;
+        const tbody = `<tbody>${rows.map((r) => `<tr>${headers.map((_, idx) => `<td>${renderInlineMarkdown(r[idx] || '')}</td>`).join('')}</tr>`).join('')}</tbody>`;
+        out.push(`<div class="md-table-wrap"><table class="md-table">${thead}${tbody}</table></div>`);
+        continue;
+      }
+      if (/^\s*>\s?/.test(line)) {
+        const qLines = [];
+        while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
+          qLines.push(lines[i].replace(/^\s*>\s?/, ''));
+          i += 1;
+        }
+        out.push(`<blockquote class="md-quote">${qLines.map(renderInlineMarkdown).join('<br>')}</blockquote>`);
+        continue;
+      }
+      if (/^\s*[-*+]\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^\s*[-*+]\s+/, ''));
+          i += 1;
+        }
+        out.push(`<ul class="md-ul">${items.map((it) => `<li>${renderInlineMarkdown(it)}</li>`).join('')}</ul>`);
+        continue;
+      }
+      if (/^\s*\d+\.\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^\s*\d+\.\s+/, ''));
+          i += 1;
+        }
+        out.push(`<ol class="md-ol">${items.map((it) => `<li>${renderInlineMarkdown(it)}</li>`).join('')}</ol>`);
+        continue;
+      }
+      const pLines = [];
+      while (
+        i < lines.length &&
+        lines[i].trim() &&
+        !/^(?:```|#{1,4}\s|\s*>\s?|\s*[-*+]\s+|\s*\d+\.\s+|\s*(?:-{3,}|\*{3,}|_{3,})\s*$)/.test(lines[i])
+      ) {
+        pLines.push(lines[i]);
+        i += 1;
+      }
+      out.push(`<p class="md-p">${pLines.map(renderInlineMarkdown).join('<br>')}</p>`);
+    }
+    return out.join('');
+  }
+
   function decodeWorkspacePath(raw) {
     if (!raw) return '';
     let s = String(raw).trim();
@@ -749,7 +859,7 @@
                                 ${
                                   isExpanded
                                     ? `<div class="gm-thinking-panel">
-                                        ${commentary.map((c) => `<div>${escapeHtml(c)}</div>`).join('')}
+                                        ${commentary.map((c) => `<div class="gm-prose" style="font-size:12.5px;color:var(--gm-text-muted);">${renderMarkdown(c)}</div>`).join('')}
                                         ${commands
                                           .map((cmd, cIdx) => {
                                             const cmdId = `${turnKey}-cmd-${cmd.id || cIdx}`;
@@ -789,7 +899,7 @@
 
                         ${
                           turn.reply
-                            ? `<div class="gm-prose">${escapeHtml(turn.reply)}</div>`
+                            ? `<div class="gm-prose">${renderMarkdown(turn.reply)}</div>`
                             : turn.error
                             ? `<div class="gm-prose" style="color:var(--gm-rose);">${escapeHtml(
                                 typeof turn.error === 'string' ? turn.error : JSON.stringify(turn.error)

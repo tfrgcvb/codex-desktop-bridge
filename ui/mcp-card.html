@@ -20,6 +20,8 @@
       --amber: #fdba74;
       --rose: #f28b82;
       --cmd-bg: #0f1013;
+      --code-bg: rgba(255, 255, 255, 0.08);
+      --table-head: rgba(255, 255, 255, 0.05);
       --font-sans: var(--font-sans, "Google Sans", "Product Sans", system-ui, -apple-system, sans-serif);
       --font-mono: var(--font-mono, "Cascadia Code", "JetBrains Mono", Consolas, monospace);
     }
@@ -37,6 +39,8 @@
       --amber: #b06000;
       --rose: #b3261e;
       --cmd-bg: #eef1f5;
+      --code-bg: rgba(15, 23, 42, 0.07);
+      --table-head: rgba(15, 23, 42, 0.04);
     }
 
     * { box-sizing: border-box; }
@@ -52,20 +56,10 @@
       overflow-x: hidden;
     }
 
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.25);
-      border-radius: 999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(148, 163, 184, 0.42);
-    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.42); }
 
     .card {
       border: 1px solid var(--border);
@@ -105,10 +99,10 @@
     .badge.interrupted, .badge.pending { background: rgba(251, 146, 60, 0.2); color: var(--amber); }
     .badge.failed { background: rgba(242, 139, 130, 0.2); color: var(--rose); }
     .body {
-      padding: 11px 13px;
+      padding: 11px 14px;
       display: flex;
       flex-direction: column;
-      gap: 9px;
+      gap: 10px;
     }
     .meta {
       font-family: var(--font-mono);
@@ -122,26 +116,159 @@
       color: var(--secondary);
       font-size: 12.5px;
       line-height: 1.55;
-      white-space: pre-wrap;
-      word-break: break-word;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
-    .prose {
-      font-size: 13.5px;
-      line-height: 1.65;
-      color: var(--text);
-      white-space: pre-wrap;
-      word-break: break-word;
+    .cmd-group {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--cmd-bg);
+      overflow: hidden;
+    }
+    .cmd-group > summary {
+      padding: 7px 11px;
+      font-size: 12px;
+      color: var(--secondary);
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      list-style: none;
+    }
+    .cmd-group > summary::-webkit-details-marker { display: none; }
+    .cmd-list {
+      border-top: 1px solid var(--border);
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      max-height: 220px;
+      overflow-y: auto;
     }
     .cmd {
       font-family: var(--font-mono);
       font-size: 11px;
-      background: var(--cmd-bg);
       color: var(--secondary);
-      padding: 6px 10px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      word-break: break-all;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
     }
+    .cmd-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .cmd-exit {
+      font-size: 10px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .cmd-exit.ok { color: var(--emerald); }
+    .cmd-exit.err { color: var(--rose); }
+
+    /* Markdown Prose Typography */
+    .md-prose {
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--text);
+      word-break: break-word;
+    }
+    .md-prose > *:first-child { margin-top: 0; }
+    .md-prose > *:last-child { margin-bottom: 0; }
+    .md-p { margin: 0 0 8px; }
+    .md-h1, .md-h2, .md-h3, .md-h4 {
+      margin: 12px 0 6px;
+      font-weight: 600;
+      line-height: 1.35;
+      color: var(--text);
+    }
+    .md-h1 { font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+    .md-h2 { font-size: 14.5px; }
+    .md-h3 { font-size: 13.5px; }
+    .md-h4 { font-size: 13px; color: var(--secondary); }
+    .md-ul, .md-ol {
+      margin: 4px 0 8px;
+      padding-left: 20px;
+    }
+    .md-ul li, .md-ol li {
+      margin: 2px 0;
+    }
+    .md-code {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      background: var(--code-bg);
+      padding: 1.5px 5px;
+      border-radius: 5px;
+    }
+    .md-pre {
+      margin: 8px 0;
+      border-radius: 10px;
+      background: var(--cmd-bg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .md-code-lang {
+      padding: 4px 10px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--table-head);
+    }
+    .md-pre code {
+      display: block;
+      padding: 9px 11px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.5;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--text);
+    }
+    .md-quote {
+      margin: 6px 0;
+      padding: 4px 11px;
+      border-left: 3px solid var(--primary);
+      color: var(--secondary);
+      background: var(--table-head);
+      border-radius: 0 6px 6px 0;
+    }
+    .md-hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 10px 0;
+    }
+    .md-table-wrap {
+      overflow-x: auto;
+      margin: 8px 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .md-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .md-table th, .md-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .md-table th {
+      background: var(--table-head);
+      font-weight: 600;
+    }
+    .md-table tr:last-child td { border-bottom: none; }
+    .md-link {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    .md-link:hover { text-decoration: underline; }
+
     button {
       border: none;
       background: rgba(168, 199, 250, 0.14);
@@ -230,7 +357,142 @@
         return String(s == null ? '' : s)
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function renderInlineMarkdown(raw) {
+        const codeTokens = [];
+        let s = escapeHtml(raw);
+        s = s.replace(/`([^`\n]+)`/g, (_, code) => {
+          const idx = codeTokens.length;
+          codeTokens.push(`<code class="md-code">${code}</code>`);
+          return `\x00C${idx}\x00`;
+        });
+        s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|codex:\/\/[^\s)]+)\)/g,
+          '<a class="md-link" href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+        s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+        s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+        s = s.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+        s = s.replace(/\x00C(\d+)\x00/g, (_, idx) => codeTokens[Number(idx)] || '');
+        return s;
+      }
+
+      function renderMarkdown(md) {
+        const lines = String(md == null ? '' : md).replace(/\r\n/g, '\n').split('\n');
+        const out = [];
+        let i = 0;
+
+        while (i < lines.length) {
+          const line = lines[i];
+
+          // Fenced code block
+          const fence = /^```([\w+-]*)\s*$/.exec(line);
+          if (fence) {
+            const lang = fence[1] || '';
+            const buf = [];
+            i += 1;
+            while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+              buf.push(lines[i]);
+              i += 1;
+            }
+            if (i < lines.length) i += 1;
+            out.push(
+              `<div class="md-pre">${lang ? `<div class="md-code-lang">${escapeHtml(lang)}</div>` : ''}<code>${escapeHtml(buf.join('\n'))}</code></div>`
+            );
+            continue;
+          }
+
+          if (!line.trim()) { i += 1; continue; }
+
+          // Horizontal rule
+          if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+            out.push('<hr class="md-hr" />');
+            i += 1;
+            continue;
+          }
+
+          // Headings
+          const hMatch = /^(#{1,4})\s+(.+)$/.exec(line);
+          if (hMatch) {
+            const lvl = hMatch[1].length;
+            out.push(`<h${lvl} class="md-h${lvl}">${renderInlineMarkdown(hMatch[2].trim())}</h${lvl}>`);
+            i += 1;
+            continue;
+          }
+
+          // GFM Table
+          if (line.includes('|') && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(lines[i + 1])) {
+            const parseCells = (row) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+            const headers = parseCells(line);
+            i += 2;
+            const rows = [];
+            while (i < lines.length && lines[i].includes('|') && lines[i].trim()) {
+              rows.push(parseCells(lines[i]));
+              i += 1;
+            }
+            const thead = `<thead><tr>${headers.map((h) => `<th>${renderInlineMarkdown(h)}</th>`).join('')}</tr></thead>`;
+            const tbody = `<tbody>${rows.map((r) => `<tr>${headers.map((_, idx) => `<td>${renderInlineMarkdown(r[idx] || '')}</td>`).join('')}</tr>`).join('')}</tbody>`;
+            out.push(`<div class="md-table-wrap"><table class="md-table">${thead}${tbody}</table></div>`);
+            continue;
+          }
+
+          // Blockquote
+          if (/^\s*>\s?/.test(line)) {
+            const qLines = [];
+            while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
+              qLines.push(lines[i].replace(/^\s*>\s?/, ''));
+              i += 1;
+            }
+            out.push(`<blockquote class="md-quote">${qLines.map(renderInlineMarkdown).join('<br>')}</blockquote>`);
+            continue;
+          }
+
+          // Unordered list
+          if (/^\s*[-*+]\s+/.test(line)) {
+            const items = [];
+            while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+              items.push(lines[i].replace(/^\s*[-*+]\s+/, ''));
+              i += 1;
+            }
+            out.push(`<ul class="md-ul">${items.map((it) => `<li>${renderInlineMarkdown(it)}</li>`).join('')}</ul>`);
+            continue;
+          }
+
+          // Ordered list
+          if (/^\s*\d+\.\s+/.test(line)) {
+            const items = [];
+            while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+              items.push(lines[i].replace(/^\s*\d+\.\s+/, ''));
+              i += 1;
+            }
+            out.push(`<ol class="md-ol">${items.map((it) => `<li>${renderInlineMarkdown(it)}</li>`).join('')}</ol>`);
+            continue;
+          }
+
+          // Paragraph
+          const pLines = [];
+          while (
+            i < lines.length &&
+            lines[i].trim() &&
+            !/^(?:```|#{1,4}\s|\s*>\s?|\s*[-*+]\s+|\s*\d+\.\s+|\s*(?:-{3,}|\*{3,}|_{3,})\s*$)/.test(lines[i])
+          ) {
+            pLines.push(lines[i]);
+            i += 1;
+          }
+          out.push(`<p class="md-p">${pLines.map(renderInlineMarkdown).join('<br>')}</p>`);
+        }
+
+        return out.join('');
+      }
+
+      function cleanCommandPreview(cmd) {
+        return String(cmd || '')
+          .replace(/^"[^"]*(?:pwsh|powershell|cmd|bash)\.exe"\s+-(?:Command|c)\s+/i, '')
+          .replace(/^['"]|['"]$/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
       }
 
       function render(data) {
@@ -253,23 +515,30 @@
           parts.push(`<div class="meta" style="color:var(--amber);">${escapeHtml(currentData.notice)}</div>`);
         }
         if (Array.isArray(currentData.commentary) && currentData.commentary.length) {
-          parts.push(`<div class="thinking">${escapeHtml(currentData.commentary.join('\n'))}</div>`);
+          parts.push(`<div class="thinking">${currentData.commentary.map((c) => `<div class="md-prose" style="font-size:12.5px;color:var(--secondary);">${renderMarkdown(c)}</div>`).join('')}</div>`);
         }
         if (Array.isArray(currentData.commands) && currentData.commands.length) {
-          for (const c of currentData.commands) {
-            parts.push(`<div class="cmd">$ ${escapeHtml(c.command || '')} (${escapeHtml(c.exitCode ?? c.status ?? '')})</div>`);
-          }
+          const cmds = currentData.commands;
+          const cmdItems = cmds.map((c) => {
+            const clean = cleanCommandPreview(c.command);
+            const exitCode = c.exitCode;
+            const exitClass = exitCode === 0 ? 'ok' : exitCode != null ? 'err' : '';
+            const exitText = exitCode != null ? `exit ${exitCode}` : (c.status || 'running');
+            return `<div class="cmd"><span class="cmd-text" title="${escapeHtml(c.command || '')}">$ ${escapeHtml(clean)}</span><span class="cmd-exit ${exitClass}">${escapeHtml(exitText)}</span></div>`;
+          }).join('');
+          parts.push(`<details class="cmd-group"><summary><span>▸ 已执行 ${cmds.length} 条终端命令</span><span style="font-size:11px;color:var(--muted);">点击展开</span></summary><div class="cmd-list">${cmdItems}</div></details>`);
         }
-        if (currentData.reply) {
-          parts.push(`<div class="prose">${escapeHtml(currentData.reply)}</div>`);
-        } else if (Array.isArray(currentData.turns) && currentData.turns.length) {
+
+        let replyText = currentData.reply;
+        if (!replyText && Array.isArray(currentData.turns) && currentData.turns.length) {
           const last = currentData.turns[currentData.turns.length - 1];
-          if (last && last.reply) {
-            parts.push(`<div class="prose">${escapeHtml(last.reply)}</div>`);
-          }
+          if (last && last.reply) replyText = last.reply;
+        }
+        if (replyText) {
+          parts.push(`<div class="md-prose">${renderMarkdown(replyText)}</div>`);
         }
         if (currentData.error) {
-          parts.push(`<div class="prose" style="color:var(--rose);">错误: ${escapeHtml(currentData.error)}</div>`);
+          parts.push(`<div class="md-prose" style="color:var(--rose);">错误: ${escapeHtml(currentData.error)}</div>`);
         }
         body.innerHTML = parts.join('') || '<div class="meta">已提交任务，可点击右上角刷新查看最新进度。</div>';
         requestAnimationFrame(reportSize);
